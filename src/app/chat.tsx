@@ -1,5 +1,5 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -15,13 +15,16 @@ import Animated, { FadeInLeft, FadeInRight, FadeInUp } from 'react-native-reanim
 import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { CrisisBanner } from '@/components/CrisisBanner';
 import { TypingIndicator } from '@/components/TypingIndicator';
+import { CHAT_WS_URL } from '@/constants/config';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
-import { getMockReply } from '@/lib/mockChatReplies';
 
 type Message = {
   id: string;
   sender: 'user' | 'ai';
   text: string;
+  // True while tokens for this bubble are still streaming in.
+  streaming?: boolean;
+  isError?: boolean;
 };
 
 const INITIAL_MESSAGES: Message[] = [
@@ -37,6 +40,47 @@ export default function ChatScreen() {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const listRef = useRef<FlatList<Message>>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    const socket = new WebSocket(CHAT_WS_URL);
+    wsRef.current = socket;
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+
+      if (data.type === 'token') {
+        setIsTyping(false);
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.sender === 'ai' && last.streaming) {
+            return prev.map((m, i) => (i === prev.length - 1 ? { ...m, text: m.text + data.text } : m));
+          }
+          return [...prev, { id: `ai-${Date.now()}`, sender: 'ai', text: data.text, streaming: true }];
+        });
+      } else if (data.type === 'done') {
+        setIsTyping(false);
+        setMessages((prev) =>
+          prev.map((m, i) => (i === prev.length - 1 ? { ...m, streaming: false } : m)),
+        );
+      } else if (data.type === 'error') {
+        setIsTyping(false);
+        setMessages((prev) => [
+          ...prev,
+          { id: `err-${Date.now()}`, sender: 'ai', text: data.message, isError: true },
+        ]);
+      }
+
+      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+    };
+
+    socket.onerror = () => setIsTyping(false);
+
+    return () => {
+      socket.close();
+      wsRef.current = null;
+    };
+  }, []);
 
   function sendMessage() {
     const trimmed = input.trim();
@@ -45,23 +89,24 @@ export default function ChatScreen() {
     const userMessage: Message = { id: Date.now().toString(), sender: 'user', text: trimmed };
     setInput('');
     setMessages((prev) => [...prev, userMessage]);
-    setIsTyping(true);
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
 
-    // Mock AI reply — will be replaced by a WebSocket stream from the local LLM engine.
-    const thinkingDelay = 800 + Math.random() * 700;
-    setTimeout(() => {
-      setIsTyping(false);
+    const socket = wsRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
       setMessages((prev) => [
         ...prev,
         {
-          id: `${userMessage.id}-ai`,
+          id: `err-${Date.now()}`,
           sender: 'ai',
-          text: getMockReply(trimmed),
+          text: "Not connected to the companion right now. Try reloading the app.",
+          isError: true,
         },
       ]);
-      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
-    }, thinkingDelay);
+      return;
+    }
+
+    setIsTyping(true);
+    socket.send(JSON.stringify({ type: 'user_message', text: trimmed }));
   }
 
   return (
@@ -82,9 +127,18 @@ export default function ChatScreen() {
         renderItem={({ item }) => (
           <Animated.View
             entering={item.sender === 'user' ? FadeInRight.duration(280) : FadeInLeft.duration(280)}
-            style={[styles.bubble, item.sender === 'user' ? styles.userBubble : styles.aiBubble]}
+            style={[
+              styles.bubble,
+              item.sender === 'user' ? styles.userBubble : styles.aiBubble,
+              item.isError && styles.errorBubble,
+            ]}
           >
-            <Text style={item.sender === 'user' ? styles.userBubbleText : styles.aiBubbleText}>
+            <Text
+              style={[
+                item.sender === 'user' ? styles.userBubbleText : styles.aiBubbleText,
+                item.isError && styles.errorBubbleText,
+              ]}
+            >
               {item.text}
             </Text>
           </Animated.View>
@@ -173,6 +227,10 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     borderBottomRightRadius: Radius.sm,
   },
+  errorBubble: {
+    backgroundColor: Colors.dangerSurface,
+    borderColor: '#f5c6c2',
+  },
   aiBubbleText: {
     color: Colors.textDark,
     fontSize: FontSize.md,
@@ -182,6 +240,9 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: FontSize.md,
     lineHeight: 21,
+  },
+  errorBubbleText: {
+    color: Colors.danger,
   },
   crisisBannerWrap: {
     marginTop: Spacing.three,

@@ -137,16 +137,46 @@ for consistency and because it's actually verifiable cross-platform.
 - Simple modal view, consistent styling with the rest of the app
 
 ## Immediate Next Steps (in order)
-1. Build `sessions.tsx`, `library.tsx` (placeholder), `settings.tsx`
-2. Build `profile.tsx` modal
-3. Add `CrisisBanner` component + `crisis-resources.tsx` stub screen
-4. Initialize backend: `backend/` folder, Python venv, FastAPI skeleton,
-   Uvicorn entrypoint
-5. Build the WebSocket endpoint that streams tokens from local Ollama
-   (via LangChain) to `chat.tsx`
-6. Design the SQLAlchemy models with the double-blind separation in mind
-   (identity table vs. session/clinical table, linked only via an anonymous
-   session ID)
+1. ~~Build `sessions.tsx`, `library.tsx` (placeholder), `settings.tsx`~~ done
+2. ~~Build `profile.tsx` modal~~ done
+3. ~~Add `CrisisBanner` component + `crisis-resources.tsx` stub screen~~ done
+4. ~~Initialize backend: `backend/` folder, Python venv, FastAPI skeleton,
+   Uvicorn entrypoint~~ done 2026-08-22
+5. ~~Build the WebSocket endpoint that streams tokens from local Ollama
+   (via LangChain) to `chat.tsx`~~ done 2026-08-22 — real streaming, no
+   fallback to mock; see "Backend (built 2026-08-22)" below
+6. **Next up:** Design the SQLAlchemy models with the double-blind
+   separation in mind (identity table vs. session/clinical table, linked
+   only via an anonymous session ID) — needed before any chat/mood/journal
+   data can move from AsyncStorage to a real database
+
+## Backend (built 2026-08-22)
+`backend/` — FastAPI + LangChain + Ollama, one real endpoint:
+`ws://localhost:8000/ws/chat`, streaming tokens from `qwen2.5-coder:3b`
+(chosen over `qwen3.5:latest` for its ~1.9GB VRAM footprint vs. 6.6GB,
+despite being code-specialized rather than general-purpose). See
+`backend/README.md` for setup/run instructions.
+
+- **Persona** (`backend/app/persona.py`): "Aria," a reflective-listening
+  wellness companion — warm, short replies, explicitly told never to write
+  code or claim to be a therapist. **Known limitation, tested 2026-08-22:**
+  this is a soft system-prompt guardrail, not enforced. When directly asked
+  to write code, the model complied fully (wrote real Python), ignoring the
+  instruction — a real tradeoff of the code-specialized model. Multi-turn
+  memory (recalling name/context across turns) works well otherwise.
+- **Memory**: scoped to a single WebSocket connection only (a plain message
+  list in that coroutine) — no session IDs, no persistence. Closing the
+  connection (reload, app restart) discards the conversation, same as the
+  frontend already did before this.
+- **Auth**: none on the WebSocket. The frontend's anonymous session is still
+  entirely mock (see `AuthContext.tsx`), so there's no real token to verify
+  yet — don't treat this endpoint as access-controlled.
+- **Frontend wiring**: `chat.tsx` now streams real tokens into the AI bubble
+  progressively via `src/constants/config.ts`'s `CHAT_WS_URL`
+  (`ws://localhost:8000/ws/chat`) — works for web/simulator; swap in the
+  dev machine's LAN IP for Expo Go on a physical phone (`localhost` won't
+  reach the host machine from a real device). `src/lib/mockChatReplies.ts`
+  is no longer used by `chat.tsx` but was left in place, unused.
 
 ## Full Product Scope (Roadmap)
 Noted 2026-08-22 for future reference — **not started**, do not begin building
