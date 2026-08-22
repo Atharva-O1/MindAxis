@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -24,15 +25,23 @@ export default function LoginScreen() {
   const { requestOtp } = useAuth();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleContinue() {
+  async function handleContinue() {
+    if (isSubmitting) return;
     const trimmed = email.trim();
     if (!EMAIL_PATTERN.test(trimmed)) {
       setError('Enter a valid email address');
       return;
     }
     setError(null);
-    requestOtp(trimmed);
+    setIsSubmitting(true);
+    const result = await requestOtp(trimmed);
+    setIsSubmitting(false);
+    if (!result.success) {
+      setError(result.error ?? 'Something went wrong.');
+      return;
+    }
     router.push('/verify-otp');
   }
 
@@ -82,9 +91,19 @@ export default function LoginScreen() {
             />
             {error && <Text style={styles.errorText}>{error}</Text>}
 
-            <AnimatedPressable style={styles.continueButton} onPress={handleContinue}>
-              <Text style={styles.continueButtonText}>Send code</Text>
-              <MaterialIcons name="arrow-forward" size={18} color={Colors.white} />
+            <AnimatedPressable
+              style={[styles.continueButton, isSubmitting && styles.continueButtonDisabled]}
+              onPress={handleContinue}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color={Colors.white} size="small" />
+              ) : (
+                <>
+                  <Text style={styles.continueButtonText}>Send code</Text>
+                  <MaterialIcons name="arrow-forward" size={18} color={Colors.white} />
+                </>
+              )}
             </AnimatedPressable>
           </Animated.View>
 
@@ -182,6 +201,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     paddingVertical: Spacing.three,
     marginTop: Spacing.two,
+  },
+  continueButtonDisabled: {
+    opacity: 0.7,
   },
   continueButtonText: {
     color: Colors.white,

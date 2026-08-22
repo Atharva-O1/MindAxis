@@ -145,10 +145,13 @@ for consistency and because it's actually verifiable cross-platform.
 5. ~~Build the WebSocket endpoint that streams tokens from local Ollama
    (via LangChain) to `chat.tsx`~~ done 2026-08-22 — real streaming, no
    fallback to mock; see "Backend (built 2026-08-22)" below
-6. **Next up:** Design the SQLAlchemy models with the double-blind
-   separation in mind (identity table vs. session/clinical table, linked
-   only via an anonymous session ID) — needed before any chat/mood/journal
-   data can move from AsyncStorage to a real database
+6. ~~Design the SQLAlchemy models with the double-blind separation in mind~~
+   done 2026-08-22 for the identity side (`students` table); a clinical/
+   session table doesn't exist yet since mood/journal/assessments still
+   live in AsyncStorage, not the database
+7. **Next up:** move mood/journal/assessment data from AsyncStorage into
+   real backend endpoints + a clinical-side table, and/or enforce the JWT on
+   the chat WebSocket (currently issued but unchecked everywhere)
 
 ## Backend (built 2026-08-22)
 `backend/` — FastAPI + LangChain + Ollama, one real endpoint:
@@ -178,13 +181,50 @@ despite being code-specialized rather than general-purpose). See
   reach the host machine from a real device). `src/lib/mockChatReplies.ts`
   is no longer used by `chat.tsx` but was left in place, unused.
 
+## Auth: real login/OTP (built 2026-08-22)
+PostgreSQL (installed locally via `winget install PostgreSQL.PostgreSQL.18`)
++ SQLAlchemy 2.0 + `bcrypt` + `PyJWT`. Two endpoints in `backend/app/auth.py`:
+`POST /auth/request-otp` and `POST /auth/verify-otp`. See `backend/README.md`
+for full setup (role/database creation, env vars).
+
+- **Schema** (`backend/app/models.py`): one table, `students` — id, email
+  (unique), `anonymous_id` (UUID4, assigned once per email on first login,
+  stable across repeat logins), `otp_hash`/`otp_expires_at`/`otp_attempts`.
+  This is the *only* place email and `anonymous_id` are ever linked —
+  double-blind principle enforced by never letting the email leave this
+  table (the JWT only carries `anonymous_id` as its `sub` claim).
+- **OTP**: real 6-digit code, bcrypt-hashed at rest, 10-minute expiry,
+  locked out after 5 wrong attempts (requires a fresh `request-otp`).
+  Delivery is stubbed — no email sending is configured, so the plaintext
+  code is printed to the backend's own console instead (chosen over
+  returning it in the API response, to keep the response contract
+  production-shaped even though delivery isn't wired up).
+- **`passlib`** (named in the original tech-stack list above) turned out to
+  be effectively abandoned — breaks under Python 3.11+'s removed `crypt`
+  module. Used `bcrypt` directly instead.
+- **JWT**: HS256, `PyJWT`, ~30-day expiry, secret from `backend/.env`'s
+  `JWT_SECRET` (gitignored, generated locally — not committed).
+- **Not done**: nothing checks this JWT on any endpoint yet (chat included)
+  — it's issued but not yet enforced anywhere. That's the natural next step,
+  not part of this slice.
+- **Frontend wiring**: `AuthContext.tsx`'s `requestOtp`/`verifyOtp` are now
+  `async` and call the real endpoints via `fetch` (`API_BASE_URL` in
+  `src/constants/config.ts`); `login.tsx`/`verify-otp.tsx` show loading
+  states and surface real server error messages (wrong-code-with-attempts-
+  remaining, expired, locked-out, network-unreachable) instead of one
+  generic message. The old fixed mock code (`123456`) and
+  `DEV_MOCK_OTP_CODE` export are gone — the OTP is real and random now.
+  CORS middleware (`allow_origins=["*"]`, local dev only) was added to
+  `backend/app/main.py` because plain HTTP POST from the browser needs it
+  (unlike the WebSocket, which doesn't hit the same preflight mechanism).
+
 ## Full Product Scope (Roadmap)
 Noted 2026-08-22 for future reference — **not started**, do not begin building
 against this until asked. Current work is still the mobile UI scaffold plus a
 mock login flow (see "Current Codebase Status" above); nothing below exists yet.
 
 **Mobile app**
-- Login and registration
+- Login and registration (built — real backend OTP auth now; see "Auth" below)
 - Dashboard
 - Mood tracking
 - PHQ-9 and GAD-7 assessments (both built — share a `Questionnaire` component)
@@ -198,7 +238,7 @@ mock login flow (see "Current Codebase Status" above); nothing below exists yet.
 - Settings and privacy controls
 
 **Backend server**
-- Authentication
+- Authentication (built — real OTP/JWT; see "Auth" section above)
 - Student profiles
 - Mood records
 - Assessments

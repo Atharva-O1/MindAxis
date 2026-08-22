@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { AnimatedPressable } from '@/components/AnimatedPressable';
-import { DEV_MOCK_OTP_CODE, useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
 
 const CODE_LENGTH = 6;
@@ -20,7 +20,8 @@ const RESEND_COOLDOWN_SECONDS = 30;
 export default function VerifyOtpScreen() {
   const { pendingEmail, verifyOtp, requestOtp, resetToEmailStep } = useAuth();
   const [digits, setDigits] = useState<string[]>(Array(CODE_LENGTH).fill(''));
-  const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
   const inputs = useRef<Array<TextInput | null>>([]);
   const shakeX = useSharedValue(0);
@@ -32,7 +33,7 @@ export default function VerifyOtpScreen() {
   }, [cooldown]);
 
   useEffect(() => {
-    if (!error) return;
+    if (!errorMessage) return;
     shakeX.value = withSequence(
       withTiming(-8, { duration: 60 }),
       withTiming(8, { duration: 60 }),
@@ -40,7 +41,7 @@ export default function VerifyOtpScreen() {
       withTiming(6, { duration: 60 }),
       withTiming(0, { duration: 60 }),
     );
-  }, [error, shakeX]);
+  }, [errorMessage, shakeX]);
 
   const shakeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shakeX.value }],
@@ -53,7 +54,7 @@ export default function VerifyOtpScreen() {
       next[index] = char;
       return next;
     });
-    setError(false);
+    setErrorMessage(null);
 
     if (char && index < CODE_LENGTH - 1) {
       inputs.current[index + 1]?.focus();
@@ -72,21 +73,27 @@ export default function VerifyOtpScreen() {
     }
   }
 
-  function attemptVerify(code: string) {
-    const success = verifyOtp(code);
-    if (!success) {
-      setError(true);
+  async function attemptVerify(code: string) {
+    setIsVerifying(true);
+    const result = await verifyOtp(code);
+    setIsVerifying(false);
+    if (!result.success) {
+      setErrorMessage(result.error ?? 'Incorrect code. Try again.');
       setDigits(Array(CODE_LENGTH).fill(''));
       inputs.current[0]?.focus();
     }
   }
 
-  function handleResend() {
+  async function handleResend() {
     if (cooldown > 0 || !pendingEmail) return;
-    requestOtp(pendingEmail);
-    setCooldown(RESEND_COOLDOWN_SECONDS);
     setDigits(Array(CODE_LENGTH).fill(''));
-    setError(false);
+    setErrorMessage(null);
+    const result = await requestOtp(pendingEmail);
+    if (!result.success) {
+      setErrorMessage(result.error ?? 'Could not resend the code.');
+      return;
+    }
+    setCooldown(RESEND_COOLDOWN_SECONDS);
     inputs.current[0]?.focus();
   }
 
@@ -117,23 +124,28 @@ export default function VerifyOtpScreen() {
               ref={(ref) => {
                 inputs.current[index] = ref;
               }}
-              style={[styles.codeBox, error && styles.codeBoxError, digit && styles.codeBoxFilled]}
+              style={[
+                styles.codeBox,
+                errorMessage && styles.codeBoxError,
+                digit && styles.codeBoxFilled,
+              ]}
               value={digit}
               onChangeText={(text) => handleChange(text, index)}
               onKeyPress={(event) => handleKeyPress(event, index)}
               keyboardType="number-pad"
               maxLength={1}
               autoFocus={index === 0}
+              editable={!isVerifying}
               textAlign="center"
             />
           ))}
         </Animated.View>
 
-        {error && <Text style={styles.errorText}>Incorrect code. Try again.</Text>}
+        {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
 
         <Animated.View entering={FadeInDown.duration(400).delay(140)} style={styles.demoHint}>
           <MaterialIcons name="info-outline" size={14} color={Colors.textMuted} />
-          <Text style={styles.demoHintText}>Demo mode — use code {DEV_MOCK_OTP_CODE}</Text>
+          <Text style={styles.demoHintText}>Demo mode — check the backend console for your code</Text>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.duration(400).delay(200)} style={styles.actions}>

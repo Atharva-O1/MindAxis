@@ -2,3 +2,7 @@ fastapi
 uvicorn[standard]
 langchain-ollama
 python-dotenv
+sqlalchemy
+psycopg[binary]
+pyjwt
+bcrypt
