@@ -16,6 +16,7 @@ import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { CrisisBanner } from '@/components/CrisisBanner';
 import { TypingIndicator } from '@/components/TypingIndicator';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
+import { getMockReply } from '@/lib/mockChatReplies';
 
 type Message = {
   id: string;
@@ -48,6 +49,7 @@ export default function ChatScreen() {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
 
     // Mock AI reply — will be replaced by a WebSocket stream from the local LLM engine.
+    const thinkingDelay = 800 + Math.random() * 700;
     setTimeout(() => {
       setIsTyping(false);
       setMessages((prev) => [
@@ -55,11 +57,11 @@ export default function ChatScreen() {
         {
           id: `${userMessage.id}-ai`,
           sender: 'ai',
-          text: "Thanks for sharing that. Tell me a bit more about how it's been affecting you.",
+          text: getMockReply(trimmed),
         },
       ]);
       requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
-    }, 1100);
+    }, thinkingDelay);
   }
 
   return (

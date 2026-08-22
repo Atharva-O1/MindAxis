@@ -1,13 +1,22 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { View } from 'react-native';
 
+import { AssessmentProvider } from '@/context/AssessmentContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { JournalProvider } from '@/context/JournalContext';
 import { MoodProvider } from '@/context/MoodContext';
 import { Colors } from '@/constants/theme';
 
 function RootNavigator() {
-  const { status } = useAuth();
+  const { status, isHydrating } = useAuth();
+
+  // Wait for the saved session to load before deciding which screen group to
+  // show — otherwise a returning signed-in user briefly flashes the login
+  // screen before Stack.Protected swaps them onto the tabs.
+  if (isHydrating) {
+    return <View style={{ flex: 1, backgroundColor: Colors.surfaceBright }} />;
+  }
 
   return (
     <Stack
@@ -50,8 +59,10 @@ export default function RootLayout() {
     <AuthProvider>
       <MoodProvider>
         <JournalProvider>
-          <StatusBar style="dark" />
-          <RootNavigator />
+          <AssessmentProvider>
+            <StatusBar style="dark" />
+            <RootNavigator />
+          </AssessmentProvider>
         </JournalProvider>
       </MoodProvider>
     </AuthProvider>

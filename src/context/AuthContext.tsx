@@ -1,4 +1,6 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+
+import { loadJSON, removeJSON, saveJSON } from '@/lib/storage';
 
 // Mock auth — no backend yet. Email is used only to prove college affiliation
 // during sign-in; once verified we mint a throwaway anonymous session ID and
@@ -6,10 +8,18 @@ import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
 // UI layer: nothing downstream (chat, assessment, sessions) ever sees the email.
 const MOCK_OTP_CODE = '123456';
 
+// Only the anonymous ID is persisted — never the email, and never the
+// mid-verification "awaitingOtp" step, so a killed app never resumes holding
+// identity data at rest. Stored via AsyncStorage rather than SecureStore: the
+// value itself carries no PII (no email, no real credential), just a random
+// local ID, so plain local storage is enough.
+const SESSION_KEY = 'mindaxis.auth.session';
+
 type AuthStatus = 'signedOut' | 'awaitingOtp' | 'signedIn';
 
 type AuthContextValue = {
   status: AuthStatus;
+  isHydrating: boolean;
   pendingEmail: string | null;
   anonymousId: string | null;
   requestOtp: (email: string) => void;
@@ -26,8 +36,19 @@ function generateAnonymousId() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('signedOut');
+  const [isHydrating, setIsHydrating] = useState(true);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [anonymousId, setAnonymousId] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadJSON<{ anonymousId: string }>(SESSION_KEY)
+      .then((session) => {
+        if (!session) return;
+        setAnonymousId(session.anonymousId);
+        setStatus('signedIn');
+      })
+      .finally(() => setIsHydrating(false));
+  }, []);
 
   function requestOtp(email: string) {
     setPendingEmail(email);
@@ -36,8 +57,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   function verifyOtp(code: string) {
     if (code !== MOCK_OTP_CODE) return false;
-    setAnonymousId(generateAnonymousId());
+    const id = generateAnonymousId();
+    setAnonymousId(id);
     setStatus('signedIn');
+    saveJSON(SESSION_KEY, { anonymousId: id });
     return true;
   }
 
@@ -50,11 +73,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPendingEmail(null);
     setAnonymousId(null);
     setStatus('signedOut');
+    removeJSON(SESSION_KEY);
   }
 
   const value = useMemo(
-    () => ({ status, pendingEmail, anonymousId, requestOtp, verifyOtp, resetToEmailStep, logout }),
-    [status, pendingEmail, anonymousId],
+    () => ({
+      status,
+      isHydrating,
+      pendingEmail,
+      anonymousId,
+      requestOtp,
+      verifyOtp,
+      resetToEmailStep,
+      logout,
+    }),
+    [status, isHydrating, pendingEmail, anonymousId],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,4 +1,6 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
+
+import { loadJSON, saveJSON } from '@/lib/storage';
 
 export type JournalEntry = {
   id: string;
@@ -7,7 +9,10 @@ export type JournalEntry = {
   updatedAt: string;
 };
 
-// Mock, in-memory only — no backend yet, same approach as Mood/Auth contexts.
+const STORAGE_KEY = 'mindaxis.journal.entries';
+
+// Seeded with a couple of entries so the screen isn't empty on first launch —
+// overwritten by whatever's in local storage once that finishes loading.
 const INITIAL_ENTRIES: JournalEntry[] = [
   {
     id: 'journal-1',
@@ -35,6 +40,18 @@ const JournalContext = createContext<JournalContextValue | null>(null);
 
 export function JournalProvider({ children }: { children: ReactNode }) {
   const [entries, setEntries] = useState<JournalEntry[]>(INITIAL_ENTRIES);
+  const hydrated = useRef(false);
+
+  useEffect(() => {
+    loadJSON<JournalEntry[]>(STORAGE_KEY).then((stored) => {
+      if (stored) setEntries(stored);
+      hydrated.current = true;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (hydrated.current) saveJSON(STORAGE_KEY, entries);
+  }, [entries]);
 
   function getEntry(id: string) {
     return entries.find((entry) => entry.id === id);

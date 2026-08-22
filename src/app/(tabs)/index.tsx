@@ -9,7 +9,10 @@ import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { CrisisBanner } from '@/components/CrisisBanner';
 import { CardShadow, Colors, FontSize, Radius, Spacing } from '@/constants/theme';
 import { getMoodOption } from '@/constants/moods';
-import { useMood } from '@/context/MoodContext';
+import { useAssessments } from '@/context/AssessmentContext';
+import { MoodEntry, useMood } from '@/context/MoodContext';
+
+const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -18,10 +21,32 @@ function getGreeting() {
   return 'Good evening';
 }
 
+function getWeekStrip(entries: MoodEntry[]) {
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    const entry = entries.find((e) => new Date(e.loggedAt).toDateString() === date.toDateString());
+    days.push({ date, entry });
+  }
+  return days;
+}
+
+function formatDaysAgo(iso: string) {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  return `${days} days ago`;
+}
+
 export default function HomeScreen() {
   const router = useRouter();
-  const { todaysEntry } = useMood();
+  const { todaysEntry, entries } = useMood();
+  const { latestByType } = useAssessments();
   const moodOption = todaysEntry ? getMoodOption(todaysEntry.level) : null;
+  const weekStrip = getWeekStrip(entries);
+  const latestPhq9 = latestByType('PHQ-9');
+  const latestGad7 = latestByType('GAD-7');
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -38,20 +63,41 @@ export default function HomeScreen() {
         <Animated.View entering={FadeInDown.duration(400).delay(120)}>
           <AnimatedPressable
             onPress={() => router.push('/mood-tracker')}
-            style={[styles.card, CardShadow, moodOption && { backgroundColor: moodOption.background }]}
+            style={[styles.card, styles.moodCard, CardShadow, moodOption && { backgroundColor: moodOption.background }]}
           >
-            <View style={[styles.cardIcon, styles.cardIconMuted]}>
-              <Text style={styles.moodEmoji}>{moodOption ? moodOption.emoji : '🙂'}</Text>
+            <View style={styles.moodCardTop}>
+              <View style={[styles.cardIcon, styles.cardIconMuted]}>
+                <Text style={styles.moodEmoji}>{moodOption ? moodOption.emoji : '🙂'}</Text>
+              </View>
+              <View style={styles.cardTextGroup}>
+                <Text style={styles.cardTitle}>
+                  {moodOption ? `Today: ${moodOption.label}` : 'Log your mood'}
+                </Text>
+                <Text style={styles.cardSubtitle}>
+                  {moodOption ? 'Tap to log another check-in' : 'A quick 10-second check-in'}
+                </Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={22} color={Colors.textMuted} />
             </View>
-            <View style={styles.cardTextGroup}>
-              <Text style={styles.cardTitle}>
-                {moodOption ? `Today: ${moodOption.label}` : 'Log your mood'}
-              </Text>
-              <Text style={styles.cardSubtitle}>
-                {moodOption ? 'Tap to log another check-in' : 'A quick 10-second check-in'}
-              </Text>
+
+            <View style={styles.weekStrip}>
+              {weekStrip.map(({ date, entry }) => {
+                const dayMood = entry ? getMoodOption(entry.level) : null;
+                return (
+                  <View key={date.toISOString()} style={styles.weekDay}>
+                    <View
+                      style={[
+                        styles.weekDayCircle,
+                        dayMood ? { backgroundColor: dayMood.background } : styles.weekDayCircleEmpty,
+                      ]}
+                    >
+                      {dayMood && <Text style={styles.weekDayEmoji}>{dayMood.emoji}</Text>}
+                    </View>
+                    <Text style={styles.weekDayLabel}>{WEEKDAY_INITIALS[date.getDay()]}</Text>
+                  </View>
+                );
+              })}
             </View>
-            <MaterialIcons name="chevron-right" size={22} color={Colors.textMuted} />
           </AnimatedPressable>
         </Animated.View>
 
@@ -89,7 +135,11 @@ export default function HomeScreen() {
             >
               <MaterialIcons name="fact-check" size={22} color={Colors.primary} />
               <Text style={styles.assessmentTitle}>PHQ-9</Text>
-              <Text style={styles.assessmentSubtitle}>Depression check-in</Text>
+              <Text style={styles.assessmentSubtitle}>
+                {latestPhq9
+                  ? `${latestPhq9.score}/${latestPhq9.maxScore} · ${formatDaysAgo(latestPhq9.completedAt)}`
+                  : 'Depression check-in'}
+              </Text>
             </AnimatedPressable>
             <AnimatedPressable
               onPress={() => router.push('/gad7')}
@@ -97,7 +147,11 @@ export default function HomeScreen() {
             >
               <MaterialIcons name="waves" size={22} color={Colors.primary} />
               <Text style={styles.assessmentTitle}>GAD-7</Text>
-              <Text style={styles.assessmentSubtitle}>Anxiety check-in</Text>
+              <Text style={styles.assessmentSubtitle}>
+                {latestGad7
+                  ? `${latestGad7.score}/${latestGad7.maxScore} · ${formatDaysAgo(latestGad7.completedAt)}`
+                  : 'Anxiety check-in'}
+              </Text>
             </AnimatedPressable>
           </View>
         </Animated.View>
@@ -163,6 +217,48 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     padding: Spacing.three,
+  },
+  moodCard: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: Spacing.three,
+  },
+  moodCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  weekStrip: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: Spacing.three,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  weekDay: {
+    alignItems: 'center',
+    gap: Spacing.half,
+  },
+  weekDayCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surfaceContainerLow,
+  },
+  weekDayCircleEmpty: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderStyle: 'dashed',
+  },
+  weekDayEmoji: {
+    fontSize: 14,
+  },
+  weekDayLabel: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
   },
   primaryCard: {
     borderWidth: 0,

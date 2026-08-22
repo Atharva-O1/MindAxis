@@ -14,6 +14,7 @@ import Animated, {
 
 import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { CardShadow, Colors, FontSize, Radius, Spacing } from '@/constants/theme';
+import { AssessmentType, useAssessments } from '@/context/AssessmentContext';
 
 const OPTIONS = [
   { label: 'Not at all', value: 0 },
@@ -23,6 +24,7 @@ const OPTIONS = [
 ];
 
 type QuestionnaireProps = {
+  type: AssessmentType;
   questions: string[];
   promptText?: string;
 };
@@ -48,10 +50,12 @@ function ProgressBar({ progress }: { progress: number }) {
 // Shared question-flow UI for any 4-point (0-3), 0/1/2/3-scored self-report
 // questionnaire — used by both the PHQ-9 and GAD-7 screens.
 export function Questionnaire({
+  type,
   questions,
   promptText = 'Over the last 2 weeks, how often have you been bothered by:',
 }: QuestionnaireProps) {
   const router = useRouter();
+  const { addResult } = useAssessments();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(Array(questions.length).fill(null));
   const [completed, setCompleted] = useState(false);
@@ -68,6 +72,8 @@ export function Questionnaire({
     if (step < questions.length - 1) {
       setStep((s) => s + 1);
     } else {
+      const total = answers.reduce<number>((sum, a) => sum + (a ?? 0), 0);
+      addResult(type, total, maxScore);
       setCompleted(true);
     }
   }

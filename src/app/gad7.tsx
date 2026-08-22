@@ -11,5 +11,5 @@ const GAD7_QUESTIONS = [
 ];
 
 export default function Gad7Screen() {
-  return <Questionnaire questions={GAD7_QUESTIONS} />;
+  return <Questionnaire type="GAD-7" questions={GAD7_QUESTIONS} />;
 }

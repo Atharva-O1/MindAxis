@@ -1,6 +1,7 @@
-import { createContext, ReactNode, useContext, useMemo, useState } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { MoodLevel } from '@/constants/moods';
+import { loadJSON, saveJSON } from '@/lib/storage';
 
 export type MoodEntry = {
   id: string;
@@ -9,8 +10,10 @@ export type MoodEntry = {
   loggedAt: string;
 };
 
-// Mock, in-memory only — no backend yet. Seeded with a little history so the
-// screen isn't empty on first load, same approach as mockSessions.ts.
+const STORAGE_KEY = 'mindaxis.mood.entries';
+
+// Seeded with a little history so the screen isn't empty on first launch —
+// overwritten by whatever's in local storage once that finishes loading.
 const INITIAL_ENTRIES: MoodEntry[] = [
   { id: 'mood-1', level: 'okay', note: '', loggedAt: '2026-08-21T09:15:00' },
   { id: 'mood-2', level: 'good', note: 'Slept well', loggedAt: '2026-08-20T21:40:00' },
@@ -31,6 +34,18 @@ function isSameDay(isoA: string, isoB: string) {
 
 export function MoodProvider({ children }: { children: ReactNode }) {
   const [entries, setEntries] = useState<MoodEntry[]>(INITIAL_ENTRIES);
+  const hydrated = useRef(false);
+
+  useEffect(() => {
+    loadJSON<MoodEntry[]>(STORAGE_KEY).then((stored) => {
+      if (stored) setEntries(stored);
+      hydrated.current = true;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (hydrated.current) saveJSON(STORAGE_KEY, entries);
+  }, [entries]);
 
   function logMood(level: MoodLevel, note = '') {
     setEntries((prev) => [

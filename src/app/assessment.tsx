@@ -13,5 +13,5 @@ const PHQ9_QUESTIONS = [
 ];
 
 export default function AssessmentScreen() {
-  return <Questionnaire questions={PHQ9_QUESTIONS} />;
+  return <Questionnaire type="PHQ-9" questions={PHQ9_QUESTIONS} />;
 }

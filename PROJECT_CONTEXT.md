@@ -65,19 +65,42 @@ principle before implementation.
   without a reason.
 
 ## Current Codebase Status
+All mobile-app roadmap items are built except counselor appointments (not
+started — offline/in-person only per the note below). Everything is
+frontend-only: no backend, no real AI, mock/local data throughout.
+
 ```
-src/app/_layout.tsx              — Root stack: (tabs) group, hidden screens
-                                    (chat, assessment), modal (profile)
-src/app/(tabs)/_layout.tsx       — Bottom tab navigator: Home, Sessions,
-                                    Library, Settings
-src/app/(tabs)/index.tsx         — Home screen (done) — routes to chat,
-                                    assessment
-src/app/chat.tsx                 — AI companion chat UI (done) —
-                                    KeyboardAvoidingView, privacy trust badge,
-                                    AI/user bubble differentiation, input state
-src/app/assessment.tsx           — PHQ-9 daily check-in (done) — custom radio
-                                    buttons, progress bar
+src/app/_layout.tsx          — Root stack: login/verify-otp/(tabs) gated by
+                                Stack.Protected on AuthContext.status, plus
+                                hidden screens (chat, assessment, gad7,
+                                mood-tracker, journal, journal-entry,
+                                resource-detail), profile modal,
+                                crisis-resources (always reachable)
+src/app/(tabs)/_layout.tsx   — Bottom tabs: Home, Sessions, Library, Settings
+src/app/(tabs)/index.tsx    — Home/Dashboard — mood week-strip + today's
+                                mood, PHQ-9/GAD-7 tiles (show latest score
+                                once taken), chat CTA, journal shortcut
+src/app/login.tsx            — College email entry
+src/app/verify-otp.tsx       — 6-digit OTP (demo code 123456, no real backend)
+src/app/chat.tsx             — Chat UI; replies are keyword-matched mock
+                                text (src/lib/mockChatReplies.ts), not a
+                                real model yet
+src/components/Questionnaire.tsx — Shared PHQ-9/GAD-7 flow; saves results
+                                via AssessmentContext
+src/app/mood-tracker.tsx, journal.tsx, journal-entry.tsx,
+src/app/(tabs)/library.tsx   — Mood tracking, journal, resources (built
+                                2026-08-22, hold lifted on Library)
 ```
+
+**Persistence:** Auth session, mood entries, journal entries, and
+assessment results are all persisted locally via AsyncStorage
+(`src/lib/storage.ts` + per-feature contexts) — survives an app
+reload/restart. This is local-device-only, not a real backend; it's a
+stand-in until the FastAPI/Postgres layer exists. `expo-secure-store` was
+tried for the auth session but its web implementation is a non-functional
+stub, and the value being stored (a random anonymous ID, no PII) doesn't
+need Keychain/Keystore-grade protection anyway — switched to AsyncStorage
+for consistency and because it's actually verifiable cross-platform.
 
 ## Screen-Specific Decisions Already Made
 
