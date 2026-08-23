@@ -6,10 +6,20 @@ for architecture, design tokens, and scope decisions.
 
 ## Get started
 
+**New machine / new teammate?** Run `setup.bat` (double-click it, or run
+`setup.ps1` in PowerShell) — it installs everything needed (Git, Node,
+Python, PostgreSQL, Ollama) and sets up the project end to end. See
+`backend/README.md` if you'd rather do it by hand, or if something in the
+script needs troubleshooting.
+
+Once set up, day to day:
+
 ```bash
-npm install
-npx expo start
+npm start
 ```
+
+(the backend needs to be running separately too — see `backend/README.md`
+for the three-terminal setup: Ollama, the FastAPI backend, and the app).
 
 This project uses [Expo Router](https://docs.expo.dev/router/introduction) with
 file-based routing under `src/app`.
@@ -34,4 +44,5 @@ src/data/mockSessions.ts          Mock session data
 ```
 
 Backend (`backend/` — FastAPI + PostgreSQL + local Ollama via LangChain) has
-not been started yet.
+real login/OTP auth and a real streaming AI chat endpoint. See
+`backend/README.md` and `PROJECT_CONTEXT.md` for what's built vs. still mock.
