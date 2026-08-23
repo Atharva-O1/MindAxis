@@ -10,6 +10,15 @@ Everything else (appointments, mood/journal/assessment records, other
 clinical data) is still frontend-only mock data — see `PROJECT_CONTEXT.md` at
 the repo root for the full roadmap.
 
+**If you're a collaborator: cloning the repo does NOT give you a working
+backend.** `.venv/`, `.env`, and the PostgreSQL database itself are all local
+to whoever set them up — none of that is in git (deliberately: secrets and a
+huge venv don't belong in version control). Everyone on the team who wants
+the chat/login features working needs to run through the full **Setup**
+section below on their own machine. Once you have, the frontend's default
+config (`localhost`) talks to your own local backend automatically — no
+shared server, no IP to coordinate as a team.
+
 ## Setup
 
 ```bash
@@ -69,11 +78,28 @@ Check it's up: `curl http://localhost:8000/health` should return `{"status":"ok"
 
 ## Connecting from the app
 
-The frontend's backend URLs live in `src/constants/config.ts` at the repo
-root (`API_BASE_URL` and `CHAT_WS_URL`). `localhost` works for web and
-simulators/emulators, but Expo Go on a physical phone can't reach `localhost`
-of your dev machine — swap both for your machine's LAN IP (e.g.
-`192.168.1.23`) when testing on a real device.
+The frontend's backend URLs are set in `src/constants/config.ts` at the repo
+root (`API_BASE_URL` and `CHAT_WS_URL`), defaulting to `localhost:8000` —
+correct out of the box for web, simulators, and anyone running the backend
+on the same machine as their Expo app (the normal case for each teammate).
+
+Expo Go on a physical phone can't reach `localhost` of your dev machine
+though — the phone's `localhost` means the phone itself. If you're testing
+on a real device, create your own **untracked** `.env.local` at the repo
+root (never commit this — your IP won't work for anyone else):
+
+```
+EXPO_PUBLIC_API_BASE_URL=http://<your-LAN-IP>:8000
+EXPO_PUBLIC_CHAT_WS_URL=ws://<your-LAN-IP>:8000/ws/chat
+```
+
+Find your LAN IP with `ipconfig` (Windows) or `ifconfig`/`ip a`
+(macOS/Linux), restart `expo start` after creating/editing `.env.local`, and
+make sure your backend is started with `uvicorn app.main:app --host 0.0.0.0`
+(not the default `127.0.0.1`-only bind) so it actually accepts connections
+from your phone. On Windows you may also need to allow the port through the
+firewall: `New-NetFirewallRule -DisplayName "MindAxis backend" -Direction
+Inbound -Protocol TCP -LocalPort 8000 -Action Allow` (run as Administrator).
 
 ## Notes
 
