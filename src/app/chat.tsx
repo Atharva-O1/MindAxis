@@ -3,10 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
+  NativeSyntheticEvent,
   Platform,
   StyleSheet,
   Text,
   TextInput,
+  TextInputKeyPressEventData,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -109,6 +111,18 @@ export default function ChatScreen() {
     socket.send(JSON.stringify({ type: 'user_message', text: trimmed }));
   }
 
+  // Web only: Enter sends, Shift+Enter still inserts a newline (standard
+  // chat-app convention). Native mobile keyboards don't have this
+  // convention, so this is a no-op there — Enter/return just types normally.
+  function handleInputKeyPress(event: NativeSyntheticEvent<TextInputKeyPressEventData>) {
+    if (Platform.OS !== 'web') return;
+    const nativeEvent = event.nativeEvent as unknown as { key: string; shiftKey?: boolean };
+    if (nativeEvent.key === 'Enter' && !nativeEvent.shiftKey) {
+      (event as unknown as { preventDefault?: () => void }).preventDefault?.();
+      sendMessage();
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <Animated.View entering={FadeInUp.duration(350)} style={styles.trustBadgeWrap}>
@@ -164,6 +178,7 @@ export default function ChatScreen() {
             placeholderTextColor={Colors.textMuted}
             value={input}
             onChangeText={setInput}
+            onKeyPress={handleInputKeyPress}
             multiline
           />
           <AnimatedPressable
