@@ -175,11 +175,15 @@ despite being code-specialized rather than general-purpose). See
   entirely mock (see `AuthContext.tsx`), so there's no real token to verify
   yet — don't treat this endpoint as access-controlled.
 - **Frontend wiring**: `chat.tsx` now streams real tokens into the AI bubble
-  progressively via `src/constants/config.ts`'s `CHAT_WS_URL`
-  (`ws://localhost:8000/ws/chat`) — works for web/simulator; swap in the
-  dev machine's LAN IP for Expo Go on a physical phone (`localhost` won't
-  reach the host machine from a real device). `src/lib/mockChatReplies.ts`
-  is no longer used by `chat.tsx` but was left in place, unused.
+  progressively via `src/constants/config.ts`'s `CHAT_WS_URL`.
+  `config.ts` auto-detects the right host at runtime (browser hostname on
+  web; `Constants.expoConfig.hostUri` on native, the same address the
+  device already used to load the JS bundle) rather than hardcoding
+  `localhost` or an IP — that was tried first and broke for teammates
+  whenever their machine's LAN IP changed networks. Backend must be started
+  with `--host 0.0.0.0` for this to reach a physical device.
+  `src/lib/mockChatReplies.ts` is no longer used by `chat.tsx` but was left
+  in place, unused.
 
 ## Auth: real login/OTP (built 2026-08-22)
 PostgreSQL (installed locally via `winget install PostgreSQL.PostgreSQL.18`)

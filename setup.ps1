@@ -161,7 +161,7 @@ Write-Host @"
 To run the app, open THREE terminals:
 
   1) ollama serve                                  (skip if already running)
-  2) cd backend; .venv\Scripts\activate; uvicorn app.main:app --reload
+  2) cd backend; .venv\Scripts\activate; uvicorn app.main:app --reload --host 0.0.0.0
   3) npm start                                      (then press w for web)
 
 OTP codes print in terminal 2's console - there's no real email sending.
