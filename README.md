@@ -46,3 +46,41 @@ src/data/mockSessions.ts          Mock session data
 Backend (`backend/` — FastAPI + PostgreSQL + local Ollama via LangChain) has
 real login/OTP auth and a real streaming AI chat endpoint. See
 `backend/README.md` and `PROJECT_CONTEXT.md` for what's built vs. still mock.
+
+Frontend (mobile app):
+
+React Native 0.86 + React 19, via Expo SDK 57
+Expo Router (file-based navigation)
+Plain React Native StyleSheet — no Tailwind/CSS libraries
+react-native-reanimated for animations (screen transitions, mood-tracker bounces, chat bubble entrances)
+expo-linear-gradient for the gradient accents
+@expo/vector-icons (MaterialIcons) for icons
+@react-native-async-storage/async-storage — local persistence for auth session, mood entries, journal entries, assessment results (survives app reload/restart)
+TypeScript throughout
+
+
+Backend
+
+Python + FastAPI (HTTP + WebSocket routing)
+Uvicorn (ASGI server)
+SQLAlchemy 2.0 (ORM)
+bcrypt for OTP hashing (not passlib — turned out to be unmaintained/broken on current Python)
+PyJWT for session tokens
+python-dotenv for config
+
+
+AI
+
+Ollama, running qwen2.5-coder:3b locally (no cloud calls)
+LangChain (langchain-ollama) for the streaming chat integration and persona/system-prompt handling
+
+
+Database
+
+PostgreSQL — one table so far (students: email + anonymous ID + hashed OTP), holding only identity data per the double-blind design
+
+
+Infra/tooling
+
+winget-based setup scripts (setup.ps1/setup.bat) for one-shot environment provisioning
+Git/GitHub for version control and team collaboration
