@@ -2,6 +2,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -75,10 +76,19 @@ export default function MoodTrackerScreen() {
   const { entries, logMood } = useMood();
   const [selected, setSelected] = useState<MoodLevel | null>(null);
   const [note, setNote] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  function handleSave() {
-    if (!selected) return;
-    logMood(selected, note.trim());
+  async function handleSave() {
+    if (!selected || isSaving) return;
+    setIsSaving(true);
+    setErrorMessage(null);
+    const result = await logMood(selected, note.trim());
+    setIsSaving(false);
+    if (!result.success) {
+      setErrorMessage(result.error ?? 'Could not save your check-in.');
+      return;
+    }
     router.back();
   }
 
@@ -118,12 +128,17 @@ export default function MoodTrackerScreen() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(400).delay(200)}>
+            {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
             <AnimatedPressable
-              style={[styles.saveButton, !selected && styles.saveButtonDisabled]}
+              style={[styles.saveButton, (!selected || isSaving) && styles.saveButtonDisabled]}
               onPress={handleSave}
-              disabled={!selected}
+              disabled={!selected || isSaving}
             >
-              <Text style={styles.saveButtonText}>Save check-in</Text>
+              {isSaving ? (
+                <ActivityIndicator color={Colors.white} size="small" />
+              ) : (
+                <Text style={styles.saveButtonText}>Save check-in</Text>
+              )}
             </AnimatedPressable>
           </Animated.View>
 
@@ -214,6 +229,12 @@ const styles = StyleSheet.create({
     color: Colors.textDark,
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  errorText: {
+    color: Colors.danger,
+    fontSize: FontSize.sm,
+    textAlign: 'center',
+    marginBottom: Spacing.two,
   },
   saveButton: {
     backgroundColor: Colors.primary,

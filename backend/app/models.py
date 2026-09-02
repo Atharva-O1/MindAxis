@@ -34,3 +34,40 @@ class Student(Base):
     otp_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+# Clinical/session-side tables below. Each has a plain `anonymous_id` column —
+# deliberately NOT a SQLAlchemy ForeignKey to students.id — so there's no
+# direct DB-level join path from a student's real identity to their mood,
+# journal, or assessment data. Same double-blind reasoning as Student above.
+
+
+class MoodEntry(Base):
+    __tablename__ = "mood_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    anonymous_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    level: Mapped[str] = mapped_column(String, nullable=False)
+    note: Mapped[str] = mapped_column(String, default="", nullable=False)
+    logged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class JournalEntry(Base):
+    __tablename__ = "journal_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    anonymous_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    title: Mapped[str] = mapped_column(String, default="", nullable=False)
+    body: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+
+
+class AssessmentResult(Base):
+    __tablename__ = "assessment_results"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    anonymous_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    max_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)

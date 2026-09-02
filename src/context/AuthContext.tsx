@@ -20,6 +20,7 @@ type AuthContextValue = {
   isHydrating: boolean;
   pendingEmail: string | null;
   anonymousId: string | null;
+  token: string | null;
   requestOtp: (email: string) => Promise<AuthResult>;
   verifyOtp: (code: string) => Promise<AuthResult>;
   resetToEmailStep: () => void;
@@ -64,12 +65,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isHydrating, setIsHydrating] = useState(true);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [anonymousId, setAnonymousId] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
     loadJSON<StoredSession>(SESSION_KEY)
       .then((session) => {
         if (!session || isJwtExpired(session.token)) return;
         setAnonymousId(session.anonymousId);
+        setToken(session.token);
         setStatus('signedIn');
       })
       .finally(() => setIsHydrating(false));
@@ -89,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!ok) return { success: false, error: data.detail ?? NETWORK_ERROR };
 
     setAnonymousId(data.anonymous_id);
+    setToken(data.token);
     setStatus('signedIn');
     saveJSON(SESSION_KEY, { token: data.token, anonymousId: data.anonymous_id });
     return { success: true };
@@ -102,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   function logout() {
     setPendingEmail(null);
     setAnonymousId(null);
+    setToken(null);
     setStatus('signedOut');
     removeJSON(SESSION_KEY);
   }
@@ -112,12 +117,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isHydrating,
       pendingEmail,
       anonymousId,
+      token,
       requestOtp,
       verifyOtp,
       resetToEmailStep,
       logout,
     }),
-    [status, isHydrating, pendingEmail, anonymousId],
+    [status, isHydrating, pendingEmail, anonymousId, token],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

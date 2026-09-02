@@ -1,7 +1,8 @@
-import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 
+import { API_BASE_URL } from '@/constants/config';
 import { MoodLevel } from '@/constants/moods';
-import { loadJSON, saveJSON } from '@/lib/storage';
+import { useAuth } from '@/context/AuthContext';
 
 export type MoodEntry = {
   id: string;
@@ -10,48 +11,63 @@ export type MoodEntry = {
   loggedAt: string;
 };
 
-const STORAGE_KEY = 'mindaxis.mood.entries';
-
-// Seeded with a little history so the screen isn't empty on first launch —
-// overwritten by whatever's in local storage once that finishes loading.
-const INITIAL_ENTRIES: MoodEntry[] = [
-  { id: 'mood-1', level: 'okay', note: '', loggedAt: '2026-08-21T09:15:00' },
-  { id: 'mood-2', level: 'good', note: 'Slept well', loggedAt: '2026-08-20T21:40:00' },
-  { id: 'mood-3', level: 'low', note: '', loggedAt: '2026-08-19T14:05:00' },
-];
+type LogMoodResult = { success: boolean; error?: string };
 
 type MoodContextValue = {
   entries: MoodEntry[];
-  logMood: (level: MoodLevel, note?: string) => void;
+  isLoading: boolean;
+  logMood: (level: MoodLevel, note?: string) => Promise<LogMoodResult>;
   todaysEntry: MoodEntry | null;
 };
 
 const MoodContext = createContext<MoodContextValue | null>(null);
 
+const NETWORK_ERROR = 'Could not reach the server. Is the backend running?';
+
 function isSameDay(isoA: string, isoB: string) {
   return new Date(isoA).toDateString() === new Date(isoB).toDateString();
 }
 
+function fromApi(raw: any): MoodEntry {
+  return { id: raw.id, level: raw.level, note: raw.note, loggedAt: raw.logged_at };
+}
+
 export function MoodProvider({ children }: { children: ReactNode }) {
-  const [entries, setEntries] = useState<MoodEntry[]>(INITIAL_ENTRIES);
-  const hydrated = useRef(false);
+  const { status, token } = useAuth();
+  const [entries, setEntries] = useState<MoodEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    loadJSON<MoodEntry[]>(STORAGE_KEY).then((stored) => {
-      if (stored) setEntries(stored);
-      hydrated.current = true;
-    });
-  }, []);
+    if (status !== 'signedIn' || !token) {
+      setEntries([]);
+      return;
+    }
+    setIsLoading(true);
+    fetch(`${API_BASE_URL}/mood`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setEntries(data.map(fromApi)))
+      .catch(() => setEntries([]))
+      .finally(() => setIsLoading(false));
+  }, [status, token]);
 
-  useEffect(() => {
-    if (hydrated.current) saveJSON(STORAGE_KEY, entries);
-  }, [entries]);
-
-  function logMood(level: MoodLevel, note = '') {
-    setEntries((prev) => [
-      { id: `mood-${Date.now()}`, level, note, loggedAt: new Date().toISOString() },
-      ...prev,
-    ]);
+  async function logMood(level: MoodLevel, note = ''): Promise<LogMoodResult> {
+    if (!token) return { success: false, error: 'Not signed in.' };
+    try {
+      const res = await fetch(`${API_BASE_URL}/mood`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ level, note }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        return { success: false, error: data.detail ?? NETWORK_ERROR };
+      }
+      const created = fromApi(await res.json());
+      setEntries((prev) => [created, ...prev]);
+      return { success: true };
+    } catch {
+      return { success: false, error: NETWORK_ERROR };
+    }
   }
 
   const todaysEntry = useMemo(
@@ -59,7 +75,10 @@ export function MoodProvider({ children }: { children: ReactNode }) {
     [entries],
   );
 
-  const value = useMemo(() => ({ entries, logMood, todaysEntry }), [entries, todaysEntry]);
+  const value = useMemo(
+    () => ({ entries, isLoading, logMood, todaysEntry }),
+    [entries, isLoading, todaysEntry],
+  );
 
   return <MoodContext.Provider value={value}>{children}</MoodContext.Provider>;
 }

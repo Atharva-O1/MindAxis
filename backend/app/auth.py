@@ -1,22 +1,17 @@
-import os
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-import jwt
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import Student
+from app.security import create_jwt
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-JWT_SECRET = os.getenv("JWT_SECRET", "changeme")
-JWT_ALGORITHM = "HS256"
-JWT_EXPIRY_DAYS = 30
 
 OTP_LENGTH = 6
 OTP_EXPIRY_MINUTES = 10
@@ -36,12 +31,6 @@ class VerifyOtpBody(BaseModel):
 
 def _generate_otp() -> str:
     return "".join(secrets.choice("0123456789") for _ in range(OTP_LENGTH))
-
-
-def _create_jwt(anonymous_id: str) -> str:
-    now = datetime.now(timezone.utc)
-    payload = {"sub": anonymous_id, "iat": now, "exp": now + timedelta(days=JWT_EXPIRY_DAYS)}
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
 @router.post("/request-otp")
@@ -93,5 +82,5 @@ def verify_otp(body: VerifyOtpBody, db: Session = Depends(get_db)):
     student.otp_attempts = 0
     db.commit()
 
-    token = _create_jwt(student.anonymous_id)
+    token = create_jwt(student.anonymous_id)
     return {"token": token, "anonymous_id": student.anonymous_id}
