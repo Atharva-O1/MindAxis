@@ -9,6 +9,7 @@ import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { CrisisBanner } from '@/components/CrisisBanner';
 import { CardShadow, Colors, FontSize, Radius, Spacing } from '@/constants/theme';
 import { getMoodOption } from '@/constants/moods';
+import { useAppointments } from '@/context/AppointmentContext';
 import { useAssessments } from '@/context/AssessmentContext';
 import { MoodEntry, useMood } from '@/context/MoodContext';
 
@@ -47,6 +48,8 @@ export default function HomeScreen() {
   const weekStrip = getWeekStrip(entries);
   const latestPhq9 = latestByType('PHQ-9');
   const latestGad7 = latestByType('GAD-7');
+  const { upcomingAppointments } = useAppointments();
+  const nextAppointment = upcomingAppointments[0];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -167,6 +170,26 @@ export default function HomeScreen() {
             <View style={styles.cardTextGroup}>
               <Text style={styles.cardTitle}>Journal</Text>
               <Text style={styles.cardSubtitle}>Write down what&apos;s on your mind</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={22} color={Colors.textMuted} />
+          </AnimatedPressable>
+        </Animated.View>
+
+        <Animated.View entering={FadeInUp.duration(450).delay(250)}>
+          <AnimatedPressable
+            onPress={() => router.push('/counselors')}
+            style={[styles.card, CardShadow]}
+          >
+            <View style={[styles.cardIcon, styles.cardIconMuted]}>
+              <MaterialIcons name="people-outline" size={24} color={Colors.primary} />
+            </View>
+            <View style={styles.cardTextGroup}>
+              <Text style={styles.cardTitle}>Campus Counselor</Text>
+              <Text style={styles.cardSubtitle}>
+                {nextAppointment
+                  ? `Next session: ${new Date(nextAppointment.slotTime).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} with ${nextAppointment.counselorName}`
+                  : 'In-person confidential guidance on campus'}
+              </Text>
             </View>
             <MaterialIcons name="chevron-right" size={22} color={Colors.textMuted} />
           </AnimatedPressable>

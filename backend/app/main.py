@@ -6,11 +6,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
+from app.appointments import appointments_router  # noqa: E402
+from app.appointments import router as counselors_router  # noqa: E402
 from app.auth import router as auth_router  # noqa: E402  (after load_dotenv)
 from app.chat import router as chat_router  # noqa: E402
 from app.db import Base, engine  # noqa: E402
 from app.mood import router as mood_router  # noqa: E402
-from app.models import AssessmentResult, JournalEntry, MoodEntry, Student  # noqa: E402,F401
+from app.models import (  # noqa: E402,F401
+    Appointment,
+    AssessmentResult,
+    Counselor,
+    CounselorSlot,
+    JournalEntry,
+    MoodEntry,
+    Student,
+)
 
 
 @asynccontextmanager
@@ -34,6 +44,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(mood_router)
+app.include_router(counselors_router)
+app.include_router(appointments_router)
 
 
 @app.get("/health")

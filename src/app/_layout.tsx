@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 
 import { AssessmentProvider } from '@/context/AssessmentContext';
+import { AppointmentProvider } from '@/context/AppointmentContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { JournalProvider } from '@/context/JournalContext';
 import { MoodProvider } from '@/context/MoodContext';
@@ -43,6 +44,7 @@ function RootNavigator() {
         <Stack.Screen name="mood-tracker" options={{ title: 'Mood Check-in' }} />
         <Stack.Screen name="journal" options={{ title: 'Journal' }} />
         <Stack.Screen name="journal-entry" options={{ title: 'Journal Entry' }} />
+        <Stack.Screen name="counselors" options={{ title: 'Campus Counseling' }} />
         <Stack.Screen name="resource-detail" options={{ title: 'Resource' }} />
         <Stack.Screen name="profile" options={{ presentation: 'modal', title: 'Profile' }} />
       </Stack.Protected>
@@ -60,8 +62,10 @@ export default function RootLayout() {
       <MoodProvider>
         <JournalProvider>
           <AssessmentProvider>
-            <StatusBar style="dark" />
-            <RootNavigator />
+            <AppointmentProvider>
+              <StatusBar style="dark" />
+              <RootNavigator />
+            </AppointmentProvider>
           </AssessmentProvider>
         </JournalProvider>
       </MoodProvider>

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -71,3 +71,47 @@ class AssessmentResult(Base):
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     max_score: Mapped[int] = mapped_column(Integer, nullable=False)
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class Counselor(Base):
+    """Staff directory for campus counseling.
+    Public staff information — not student data.
+    """
+    __tablename__ = "counselors"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    department: Mapped[str] = mapped_column(String, nullable=False)
+    location: Mapped[str] = mapped_column(String, nullable=False)
+    specialties: Mapped[str] = mapped_column(String, default="", nullable=False)
+    bio: Mapped[str] = mapped_column(String, default="", nullable=False)
+    avatar_color: Mapped[str] = mapped_column(String, default="#0058be", nullable=False)
+
+
+class CounselorSlot(Base):
+    """Available in-person appointment time slots."""
+    __tablename__ = "counselor_slots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    counselor_id: Mapped[int] = mapped_column(Integer, ForeignKey("counselors.id"), index=True, nullable=False)
+    slot_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_booked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+class Appointment(Base):
+    """Double-blind in-person appointment booking.
+    Contains ONLY anonymous_id (no FK to students table).
+    """
+    __tablename__ = "appointments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    anonymous_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    counselor_id: Mapped[int] = mapped_column(Integer, ForeignKey("counselors.id"), nullable=False)
+    counselor_name: Mapped[str] = mapped_column(String, nullable=False)
+    location: Mapped[str] = mapped_column(String, nullable=False)
+    slot_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    topic: Mapped[str] = mapped_column(String, default="", nullable=False)
+    status: Mapped[str] = mapped_column(String, default="scheduled", nullable=False)  # scheduled, cancelled, completed
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
