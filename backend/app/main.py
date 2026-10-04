@@ -14,7 +14,16 @@ from app.db import Base, engine  # noqa: E402
 from app.journal import router as journal_router  # noqa: E402
 from app.mood import router as mood_router  # noqa: E402
 from app.notifications import router as notifications_router  # noqa: E402
-from app.models import Appointment, AssessmentResult, JournalEntry, MoodEntry, NotificationPreference, Student  # noqa: E402,F401
+from app.models import (  # noqa: E402,F401
+    Appointment,
+    AssessmentResult,
+    Counselor,
+    CounselorSlot,
+    JournalEntry,
+    MoodEntry,
+    NotificationPreference,
+    Student,
+)
 
 
 @asynccontextmanager
@@ -43,6 +52,10 @@ app.include_router(assessment_router)
 app.include_router(notifications_router)
 app.include_router(appointments_router)
 
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 
 

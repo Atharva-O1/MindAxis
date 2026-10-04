@@ -51,11 +51,11 @@ def _serialize(app: Appointment) -> dict:
     return {
         "id": str(app.id),
         "counselor_name": app.counselor_name,
-        "counselor_title": app.counselor_title,
+        "counselor_title": getattr(app, "counselor_title", "Counselor"),
         "location": app.location,
-        "appointment_date": app.appointment_date,
-        "time_slot": app.time_slot,
-        "notes": app.notes,
+        "appointment_date": getattr(app, "appointment_date", ""),
+        "time_slot": getattr(app, "time_slot", ""),
+        "notes": getattr(app, "notes", ""),
         "status": app.status,
         "created_at": app.created_at.isoformat() if app.created_at else None,
     }

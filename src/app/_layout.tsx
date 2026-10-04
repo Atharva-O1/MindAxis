@@ -59,6 +59,7 @@ function RootNavigator() {
         <Stack.Screen name="journal" options={{ title: 'Journal' }} />
         <Stack.Screen name="journal-entry" options={{ title: 'Journal Entry' }} />
         <Stack.Screen name="appointments" options={{ title: 'Campus Counselor' }} />
+        <Stack.Screen name="counselors" options={{ title: 'Campus Counseling' }} />
         <Stack.Screen name="resource-detail" options={{ title: 'Resource' }} />
         <Stack.Screen name="profile" options={{ presentation: 'modal', title: 'Profile' }} />
       </Stack.Protected>
@@ -88,4 +89,5 @@ export default function RootLayout() {
     </AuthProvider>
   );
 }
+
 

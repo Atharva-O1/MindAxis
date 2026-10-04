@@ -9,6 +9,7 @@ import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { CrisisBanner } from '@/components/CrisisBanner';
 import { CardShadow, Colors, FontSize, Radius, Spacing } from '@/constants/theme';
 import { getMoodOption } from '@/constants/moods';
+import { useAppointments } from '@/context/AppointmentContext';
 import { useAssessments } from '@/context/AssessmentContext';
 import { MoodEntry, useMood } from '@/context/MoodContext';
 
@@ -47,6 +48,8 @@ export default function HomeScreen() {
   const weekStrip = getWeekStrip(entries);
   const latestPhq9 = latestByType('PHQ-9');
   const latestGad7 = latestByType('GAD-7');
+  const { upcomingAppointments } = useAppointments();
+  const nextAppointment = upcomingAppointments[0];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -182,7 +185,11 @@ export default function HomeScreen() {
             </View>
             <View style={styles.cardTextGroup}>
               <Text style={styles.cardTitle}>Campus Counselor</Text>
-              <Text style={styles.cardSubtitle}>Book an in-person session at campus wellness office</Text>
+              <Text style={styles.cardSubtitle}>
+                {nextAppointment
+                  ? `Next session: ${new Date(nextAppointment.appointment_date || nextAppointment.created_at || Date.now()).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} with ${nextAppointment.counselor_name}`
+                  : 'Book an in-person session at campus wellness office'}
+              </Text>
             </View>
             <MaterialIcons name="chevron-right" size={22} color={Colors.textMuted} />
           </AnimatedPressable>
