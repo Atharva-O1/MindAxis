@@ -31,13 +31,17 @@ const COUNSELORS_LIST = [
 
 export default function CounselorLoginScreen() {
   const router = useRouter();
-  const [selectedCounselor, setSelectedCounselor] = useState(COUNSELORS_LIST[0].name);
+  const [counselorName, setCounselorName] = useState(COUNSELORS_LIST[0].name);
   const [accessKey, setAccessKey] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleLogin() {
     if (isSubmitting) return;
+    if (!counselorName.trim()) {
+      setError('Please enter or select your Counselor Name');
+      return;
+    }
     if (!accessKey.trim()) {
       setError('Please enter your Counselor Access Key');
       return;
@@ -51,7 +55,7 @@ export default function CounselorLoginScreen() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          counselor_name: selectedCounselor,
+          counselor_name: counselorName.trim(),
           counselor_key: accessKey.trim(),
         }),
       });
@@ -99,21 +103,36 @@ export default function CounselorLoginScreen() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(450).delay(100)} style={styles.section}>
-            <Text style={styles.label}>Select Counselor Profile</Text>
+            <Text style={styles.label}>Counselor Name</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your full name (e.g. Dr. Atharva Ramteke)"
+              placeholderTextColor={Colors.textMuted}
+              value={counselorName}
+              onChangeText={(t) => {
+                setCounselorName(t);
+                if (error) setError(null);
+              }}
+            />
+
+            <Text style={[styles.label, { marginTop: Spacing.two }]}>Or Select Campus Profile</Text>
             {COUNSELORS_LIST.map((c) => (
               <TouchableOpacity
                 key={c.name}
                 style={[
                   styles.counselorCard,
-                  selectedCounselor === c.name && styles.counselorCardSelected,
+                  counselorName.trim() === c.name && styles.counselorCardSelected,
                 ]}
-                onPress={() => setSelectedCounselor(c.name)}
+                onPress={() => {
+                  setCounselorName(c.name);
+                  if (error) setError(null);
+                }}
               >
                 <View style={styles.counselorCardText}>
                   <Text
                     style={[
                       styles.counselorName,
-                      selectedCounselor === c.name && styles.counselorNameSelected,
+                      counselorName.trim() === c.name && styles.counselorNameSelected,
                     ]}
                   >
                     {c.name}
@@ -122,7 +141,7 @@ export default function CounselorLoginScreen() {
                     {c.title} • {c.location}
                   </Text>
                 </View>
-                {selectedCounselor === c.name && (
+                {counselorName.trim() === c.name && (
                   <MaterialIcons name="check-circle" size={24} color={Colors.primary} />
                 )}
               </TouchableOpacity>
@@ -133,7 +152,7 @@ export default function CounselorLoginScreen() {
             <Text style={styles.label}>Access Key</Text>
             <TextInput
               style={[styles.input, error ? styles.inputError : null]}
-              placeholder="Enter Access Key (default: COUNSELOR2026)"
+              placeholder="Enter Access Key (MINDAXIS26)"
               placeholderTextColor={Colors.textMuted}
               secureTextEntry
               value={accessKey}

@@ -92,13 +92,13 @@ class CounselorLoginBody(BaseModel):
     counselor_key: str
 
 
-COUNSELOR_ACCESS_KEY = os.getenv("COUNSELOR_ACCESS_KEY", "COUNSELOR2026")
+COUNSELOR_ACCESS_KEY = os.getenv("COUNSELOR_ACCESS_KEY", "MINDAXIS26")
 
 
 @router.post("/counselor-login")
 def counselor_login(body: CounselorLoginBody):
     key = body.counselor_key.strip()
-    if key != COUNSELOR_ACCESS_KEY:
+    if key.upper() != COUNSELOR_ACCESS_KEY.upper():
         raise HTTPException(status_code=401, detail="Invalid Counselor Access Key.")
 
     counselor_name = body.counselor_name.strip()
