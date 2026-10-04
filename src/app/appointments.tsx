@@ -226,7 +226,7 @@ export default function AppointmentsScreen() {
                       <View style={styles.detailRow}>
                         <MaterialIcons name="calendar-today" size={16} color={Colors.primary} />
                         <Text style={styles.detailText}>
-                          {formatDateLabel(app.appointment_date)} ({app.time_slot})
+                          {formatDateLabel(app.appointment_date || app.created_at || '')} ({app.time_slot})
                         </Text>
                       </View>
                       <View style={styles.detailRow}>
