@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ReactNode, useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -9,6 +9,7 @@ import { AnimatedPressable } from '@/components/AnimatedPressable';
 import { CrisisBanner } from '@/components/CrisisBanner';
 import { CardShadow, Colors, FontSize, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { useNotifications } from '@/context/NotificationContext';
 
 function SectionLabel({ children }: { children: string }) {
   return <Text style={styles.sectionLabel}>{children}</Text>;
@@ -41,11 +42,59 @@ function SettingsRow({
   );
 }
 
+function formatTime(timeStr: string): string {
+  const [hStr, mStr] = timeStr.split(':');
+  const h = parseInt(hStr || '20', 10);
+  const m = mStr || '00';
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${m} ${ampm}`;
+}
+
 export default function SettingsScreen() {
   const router = useRouter();
   const { anonymousId, logout } = useAuth();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [dailyReminder, setDailyReminder] = useState(true);
+  const {
+    enabled,
+    dailyReminderEnabled,
+    reminderTime,
+    updatePreferences,
+    sendTestNotification,
+    requestPermission,
+  } = useNotifications();
+
+  const handleNotificationsToggle = async (val: boolean): Promise<void> => {
+    if (val) {
+      const granted = await requestPermission();
+      if (!granted) {
+        Alert.alert(
+          'Permission Needed',
+          'Notification permissions are required to receive reminders.'
+        );
+      }
+    }
+    await updatePreferences({ enabled: val });
+  };
+
+  const handleCycleTime = () => {
+    // Cycle between popular reminder times: 09:00, 20:00, 21:30
+    const times = ['09:00', '20:00', '21:30'];
+    const currentIndex = times.indexOf(reminderTime);
+    const nextTime = times[(currentIndex + 1) % times.length];
+    updatePreferences({ reminderTime: nextTime });
+  };
+
+  const handleTestNotification = async () => {
+    const sent = await sendTestNotification();
+    if (sent) {
+      Alert.alert('Test Notification Sent', 'A test reminder has been triggered!');
+    } else {
+      Alert.alert(
+        'Permission Disabled',
+        'Could not send test notification. Please enable notification permissions.'
+      );
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -71,8 +120,10 @@ export default function SettingsScreen() {
               label="Notifications"
               rightElement={
                 <Switch
-                  value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
+                  value={enabled}
+                  onValueChange={(val) => {
+                    handleNotificationsToggle(val);
+                  }}
                   trackColor={{ false: Colors.border, true: Colors.primary }}
                 />
               }
@@ -83,11 +134,31 @@ export default function SettingsScreen() {
               label="Daily check-in reminder"
               rightElement={
                 <Switch
-                  value={dailyReminder}
-                  onValueChange={setDailyReminder}
+                  value={dailyReminderEnabled}
+                  disabled={!enabled}
+                  onValueChange={(val) => {
+                    updatePreferences({ dailyReminderEnabled: val });
+                  }}
                   trackColor={{ false: Colors.border, true: Colors.primary }}
                 />
               }
+            />
+            {enabled && dailyReminderEnabled && (
+              <>
+                <View style={styles.divider} />
+                <SettingsRow
+                  icon="schedule"
+                  label="Reminder time"
+                  value={formatTime(reminderTime)}
+                  onPress={handleCycleTime}
+                />
+              </>
+            )}
+            <View style={styles.divider} />
+            <SettingsRow
+              icon="notifications-active"
+              label="Send test reminder"
+              onPress={handleTestNotification}
             />
           </View>
         </Animated.View>
@@ -132,6 +203,7 @@ export default function SettingsScreen() {
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

@@ -172,6 +172,22 @@ export default function HomeScreen() {
           </AnimatedPressable>
         </Animated.View>
 
+        <Animated.View entering={FadeInUp.duration(450).delay(250)}>
+          <AnimatedPressable
+            onPress={() => router.push('/appointments' as any)}
+            style={[styles.card, CardShadow]}
+          >
+            <View style={[styles.cardIcon, styles.cardIconMuted]}>
+              <MaterialIcons name="local-hospital" size={24} color={Colors.primary} />
+            </View>
+            <View style={styles.cardTextGroup}>
+              <Text style={styles.cardTitle}>Campus Counselor</Text>
+              <Text style={styles.cardSubtitle}>Book an in-person session at campus wellness office</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={22} color={Colors.textMuted} />
+          </AnimatedPressable>
+        </Animated.View>
+
         <Animated.View entering={FadeInUp.duration(400).delay(280)} style={styles.privacyNote}>
           <MaterialIcons name="lock" size={16} color={Colors.textMuted} />
           <Text style={styles.privacyText}>

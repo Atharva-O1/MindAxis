@@ -143,11 +143,6 @@ export default function VerifyOtpScreen() {
 
         {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
 
-        <Animated.View entering={FadeInDown.duration(400).delay(140)} style={styles.demoHint}>
-          <MaterialIcons name="info-outline" size={14} color={Colors.textMuted} />
-          <Text style={styles.demoHintText}>Demo mode — check the backend console for your code</Text>
-        </Animated.View>
-
         <Animated.View entering={FadeInDown.duration(400).delay(200)} style={styles.actions}>
           <AnimatedPressable onPress={handleResend} disabled={cooldown > 0} style={styles.resendButton}>
             <Text style={[styles.resendText, cooldown > 0 && styles.resendTextDisabled]}>

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -71,3 +71,31 @@ class AssessmentResult(Base):
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     max_score: Mapped[int] = mapped_column(Integer, nullable=False)
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class NotificationPreference(Base):
+    __tablename__ = "notification_preferences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    anonymous_id: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    daily_reminder_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    reminder_time: Mapped[str] = mapped_column(String, default="20:00", nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    anonymous_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    counselor_name: Mapped[str] = mapped_column(String, nullable=False)
+    counselor_title: Mapped[str] = mapped_column(String, nullable=False)
+    location: Mapped[str] = mapped_column(String, nullable=False)
+    appointment_date: Mapped[str] = mapped_column(String, nullable=False)
+    time_slot: Mapped[str] = mapped_column(String, nullable=False)
+    notes: Mapped[str] = mapped_column(String, default="", nullable=False)
+    status: Mapped[str] = mapped_column(String, default="scheduled", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+

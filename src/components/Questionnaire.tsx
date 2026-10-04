@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   BounceIn,
@@ -59,6 +59,8 @@ export function Questionnaire({
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(Array(questions.length).fill(null));
   const [completed, setCompleted] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const progress = (step + 1) / questions.length;
   const currentAnswer = answers[step];
@@ -68,14 +70,21 @@ export function Questionnaire({
     setAnswers((prev) => prev.map((a, i) => (i === step ? value : a)));
   }
 
-  function goNext() {
+  async function goNext() {
     if (step < questions.length - 1) {
       setStep((s) => s + 1);
-    } else {
-      const total = answers.reduce<number>((sum, a) => sum + (a ?? 0), 0);
-      addResult(type, total, maxScore);
-      setCompleted(true);
+      return;
     }
+    const total = answers.reduce<number>((sum, a) => sum + (a ?? 0), 0);
+    setIsSaving(true);
+    setSaveError(null);
+    const result = await addResult(type, total, maxScore);
+    setIsSaving(false);
+    if (!result.success) {
+      setSaveError(result.error ?? 'Could not save your check-in.');
+      return;
+    }
+    setCompleted(true);
   }
 
   function goBack() {
@@ -147,6 +156,8 @@ export function Questionnaire({
         </Animated.View>
       </ScrollView>
 
+      {saveError && <Text style={styles.errorText}>{saveError}</Text>}
+
       <View style={styles.navRow}>
         <AnimatedPressable
           style={[styles.navButton, styles.navButtonSecondary]}
@@ -167,12 +178,16 @@ export function Questionnaire({
           style={[
             styles.navButton,
             styles.navButtonPrimary,
-            currentAnswer === null && styles.navButtonDisabled,
+            (currentAnswer === null || isSaving) && styles.navButtonDisabled,
           ]}
           onPress={goNext}
-          disabled={currentAnswer === null}
+          disabled={currentAnswer === null || isSaving}
         >
-          <Text style={styles.navButtonText}>{step === questions.length - 1 ? 'Finish' : 'Next'}</Text>
+          {isSaving ? (
+            <ActivityIndicator color={Colors.white} size="small" />
+          ) : (
+            <Text style={styles.navButtonText}>{step === questions.length - 1 ? 'Finish' : 'Next'}</Text>
+          )}
         </AnimatedPressable>
       </View>
     </SafeAreaView>
@@ -263,6 +278,12 @@ const styles = StyleSheet.create({
   optionLabelSelected: {
     color: Colors.primary,
     fontWeight: '600',
+  },
+  errorText: {
+    color: Colors.danger,
+    fontSize: FontSize.sm,
+    textAlign: 'center',
+    marginHorizontal: Spacing.four,
   },
   navRow: {
     flexDirection: 'row',

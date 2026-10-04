@@ -10,20 +10,48 @@ current behavior (chat messages aren't saved anywhere either).
 import json
 import os
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 
 from app.persona import PERSONA_PROMPT
+from app.security import InvalidToken, decode_jwt
 
 router = APIRouter()
 
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
+# Close code used when the handshake carries no valid session — distinct from
+# the standard 1000-1015 range so the client can tell "you're logged out"
+# apart from an ordinary disconnect.
+AUTH_FAILED_CLOSE_CODE = 4401
+
 
 @router.websocket("/ws/chat")
-async def chat_endpoint(websocket: WebSocket) -> None:
+async def chat_endpoint(websocket: WebSocket, token: str | None = Query(default=None)) -> None:
+    # Same JWT used for every other endpoint, just carried as a query param
+    # instead of an Authorization header — browsers can't set custom headers
+    # on a WebSocket handshake, so this is the standard workaround.
+    reject_reason: str | None = None
+    if token is None:
+        reject_reason = "Missing auth token."
+    else:
+        try:
+            decode_jwt(token)
+        except InvalidToken as exc:
+            reject_reason = str(exc)
+
+    if reject_reason is not None:
+        # Must accept() before close() here: closing pre-accept gets turned
+        # into a bare HTTP 403 by this ASGI stack, which browsers surface as
+        # an opaque connection failure with no readable close code — the
+        # client's onclose handler would never see AUTH_FAILED_CLOSE_CODE.
+        # Accepting first guarantees a real close frame reaches the client.
+        await websocket.accept()
+        await websocket.close(code=AUTH_FAILED_CLOSE_CODE, reason=reject_reason)
+        return
+
     await websocket.accept()
     llm = ChatOllama(model=OLLAMA_MODEL, base_url=OLLAMA_BASE_URL)
     messages: list[BaseMessage] = [SystemMessage(content=PERSONA_PROMPT)]

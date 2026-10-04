@@ -1,12 +1,27 @@
+import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 
+import { AppointmentProvider } from '@/context/AppointmentContext';
 import { AssessmentProvider } from '@/context/AssessmentContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { JournalProvider } from '@/context/JournalContext';
 import { MoodProvider } from '@/context/MoodContext';
+import { NotificationProvider } from '@/context/NotificationContext';
 import { Colors } from '@/constants/theme';
+
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 function RootNavigator() {
   const { status, isHydrating } = useAuth();
@@ -43,6 +58,7 @@ function RootNavigator() {
         <Stack.Screen name="mood-tracker" options={{ title: 'Mood Check-in' }} />
         <Stack.Screen name="journal" options={{ title: 'Journal' }} />
         <Stack.Screen name="journal-entry" options={{ title: 'Journal Entry' }} />
+        <Stack.Screen name="appointments" options={{ title: 'Campus Counselor' }} />
         <Stack.Screen name="resource-detail" options={{ title: 'Resource' }} />
         <Stack.Screen name="profile" options={{ presentation: 'modal', title: 'Profile' }} />
       </Stack.Protected>
@@ -57,14 +73,19 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <MoodProvider>
-        <JournalProvider>
-          <AssessmentProvider>
-            <StatusBar style="dark" />
-            <RootNavigator />
-          </AssessmentProvider>
-        </JournalProvider>
-      </MoodProvider>
+      <NotificationProvider>
+        <AppointmentProvider>
+          <MoodProvider>
+            <JournalProvider>
+              <AssessmentProvider>
+                <StatusBar style="dark" />
+                <RootNavigator />
+              </AssessmentProvider>
+            </JournalProvider>
+          </MoodProvider>
+        </AppointmentProvider>
+      </NotificationProvider>
     </AuthProvider>
   );
 }
+

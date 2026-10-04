@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.email_service import send_otp_email
 from app.models import Student
 from app.security import create_jwt
 
@@ -50,11 +51,10 @@ def request_otp(body: RequestOtpBody, db: Session = Depends(get_db)):
     student.otp_attempts = 0
     db.commit()
 
-    # Dev-only delivery stand-in — no email sending is configured. A real
-    # deployment would send this over email instead of printing it.
-    print(f"[auth] OTP for {email}: {code}")
+    # Send real email via SMTP if configured, or print to console fallback
+    send_otp_email(to_email=email, code=code)
 
-    return {"message": "Code sent."}
+    return {"message": "Verification code sent to your email."}
 
 
 @router.post("/verify-otp")

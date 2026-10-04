@@ -2,6 +2,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -25,13 +26,20 @@ export default function JournalEntryScreen() {
 
   const [title, setTitle] = useState(existing?.title ?? '');
   const [body, setBody] = useState(existing?.body ?? '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  function handleSave() {
-    if (!body.trim()) return;
-    if (existing) {
-      updateEntry(existing.id, title.trim(), body.trim());
-    } else {
-      addEntry(title.trim(), body.trim());
+  async function handleSave() {
+    if (!body.trim() || isSaving) return;
+    setIsSaving(true);
+    setErrorMessage(null);
+    const result = existing
+      ? await updateEntry(existing.id, title.trim(), body.trim())
+      : await addEntry(title.trim(), body.trim());
+    setIsSaving(false);
+    if (!result.success) {
+      setErrorMessage(result.error ?? 'Could not save your entry.');
+      return;
     }
     router.back();
   }
@@ -43,9 +51,13 @@ export default function JournalEntryScreen() {
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => {
-          deleteEntry(existing.id);
-          router.back();
+        onPress: async () => {
+          const result = await deleteEntry(existing.id);
+          if (result.success) {
+            router.back();
+          } else {
+            setErrorMessage(result.error ?? 'Could not delete this entry.');
+          }
         },
       },
     ]);
@@ -77,6 +89,8 @@ export default function JournalEntryScreen() {
           />
         </ScrollView>
 
+        {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
+
         <View style={styles.actions}>
           {existing && (
             <AnimatedPressable style={styles.deleteButton} onPress={handleDelete}>
@@ -85,11 +99,15 @@ export default function JournalEntryScreen() {
             </AnimatedPressable>
           )}
           <AnimatedPressable
-            style={[styles.saveButton, !body.trim() && styles.saveButtonDisabled]}
+            style={[styles.saveButton, (!body.trim() || isSaving) && styles.saveButtonDisabled]}
             onPress={handleSave}
-            disabled={!body.trim()}
+            disabled={!body.trim() || isSaving}
           >
-            <Text style={styles.saveButtonText}>Save</Text>
+            {isSaving ? (
+              <ActivityIndicator color={Colors.white} size="small" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save</Text>
+            )}
           </AnimatedPressable>
         </View>
       </KeyboardAvoidingView>
@@ -122,6 +140,13 @@ const styles = StyleSheet.create({
     color: Colors.textDark,
     lineHeight: 22,
     minHeight: 200,
+  },
+  errorText: {
+    color: Colors.danger,
+    fontSize: FontSize.sm,
+    textAlign: 'center',
+    paddingHorizontal: Spacing.four,
+    paddingBottom: Spacing.two,
   },
   actions: {
     flexDirection: 'row',

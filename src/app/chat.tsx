@@ -19,6 +19,12 @@ import { CrisisBanner } from '@/components/CrisisBanner';
 import { TypingIndicator } from '@/components/TypingIndicator';
 import { CHAT_WS_URL } from '@/constants/config';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
+
+// Distinct close code the backend sends when the socket's ?token= is
+// missing, invalid, or expired (see backend/app/chat.py) — lets the client
+// tell "you're logged out" apart from an ordinary disconnect.
+const AUTH_FAILED_CLOSE_CODE = 4401;
 
 type Message = {
   id: string;
@@ -38,6 +44,7 @@ const INITIAL_MESSAGES: Message[] = [
 ];
 
 export default function ChatScreen() {
+  const { token } = useAuth();
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -45,7 +52,12 @@ export default function ChatScreen() {
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const socket = new WebSocket(CHAT_WS_URL);
+    // This screen only renders once signed in (see src/app/_layout.tsx), so
+    // token should always be set here — but skip connecting rather than
+    // handing the backend an empty token if that assumption ever breaks.
+    if (!token) return;
+
+    const socket = new WebSocket(`${CHAT_WS_URL}?token=${encodeURIComponent(token)}`);
     wsRef.current = socket;
 
     socket.onmessage = (event) => {
@@ -78,11 +90,26 @@ export default function ChatScreen() {
 
     socket.onerror = () => setIsTyping(false);
 
+    socket.onclose = (event) => {
+      setIsTyping(false);
+      if (event.code === AUTH_FAILED_CLOSE_CODE) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `err-${Date.now()}`,
+            sender: 'ai',
+            text: 'Your session expired. Please log out and log back in.',
+            isError: true,
+          },
+        ]);
+      }
+    };
+
     return () => {
       socket.close();
       wsRef.current = null;
     };
-  }, []);
+  }, [token]);
 
   function sendMessage() {
     const trimmed = input.trim();

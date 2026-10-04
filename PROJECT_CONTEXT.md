@@ -81,26 +81,32 @@ src/app/(tabs)/index.tsx    — Home/Dashboard — mood week-strip + today's
                                 mood, PHQ-9/GAD-7 tiles (show latest score
                                 once taken), chat CTA, journal shortcut
 src/app/login.tsx            — College email entry
-src/app/verify-otp.tsx       — 6-digit OTP (demo code 123456, no real backend)
-src/app/chat.tsx             — Chat UI; replies are keyword-matched mock
-                                text (src/lib/mockChatReplies.ts), not a
-                                real model yet
+src/app/verify-otp.tsx       — Real 6-digit OTP, backend-verified (see
+                                "Auth" below)
+src/app/chat.tsx             — Chat UI; real streaming tokens from Ollama
+                                over an auth-gated WebSocket (see "Backend")
 src/components/Questionnaire.tsx — Shared PHQ-9/GAD-7 flow; saves results
-                                via AssessmentContext
+                                via AssessmentContext (backend-persisted)
 src/app/mood-tracker.tsx, journal.tsx, journal-entry.tsx,
-src/app/(tabs)/library.tsx   — Mood tracking, journal, resources (built
-                                2026-08-22, hold lifted on Library)
+src/app/(tabs)/library.tsx   — Mood tracking, journal (both backend-
+                                persisted, see "Journal + assessments
+                                backend" below), resources (still mock
+                                content)
 ```
 
-**Persistence:** Auth session, mood entries, journal entries, and
-assessment results are all persisted locally via AsyncStorage
-(`src/lib/storage.ts` + per-feature contexts) — survives an app
-reload/restart. This is local-device-only, not a real backend; it's a
-stand-in until the FastAPI/Postgres layer exists. `expo-secure-store` was
-tried for the auth session but its web implementation is a non-functional
-stub, and the value being stored (a random anonymous ID, no PII) doesn't
-need Keychain/Keystore-grade protection anyway — switched to AsyncStorage
-for consistency and because it's actually verifiable cross-platform.
+**Persistence:** Auth session token is stored locally via AsyncStorage
+(`src/lib/storage.ts`) — just the JWT + anonymous ID, survives an app
+reload/restart. `expo-secure-store` was tried for this but its web
+implementation is a non-functional stub, and the value being stored (a
+random anonymous ID, no PII) doesn't need Keychain/Keystore-grade
+protection anyway — switched to AsyncStorage for consistency and because
+it's actually verifiable cross-platform.
+
+Mood entries, journal entries, and assessment results are **no longer
+AsyncStorage-based** — as of 2026-09-20 all three live in Postgres, fetched
+per-session over authenticated REST endpoints (see "Journal + assessments
+backend" below). Resources/library content is still hand-written mock data
+(there's no backend concept of "resources" — it's static by design).
 
 ## Screen-Specific Decisions Already Made
 
@@ -146,12 +152,18 @@ for consistency and because it's actually verifiable cross-platform.
    (via LangChain) to `chat.tsx`~~ done 2026-08-22 — real streaming, no
    fallback to mock; see "Backend (built 2026-08-22)" below
 6. ~~Design the SQLAlchemy models with the double-blind separation in mind~~
-   done 2026-08-22 for the identity side (`students` table); a clinical/
-   session table doesn't exist yet since mood/journal/assessments still
-   live in AsyncStorage, not the database
-7. **Next up:** move mood/journal/assessment data from AsyncStorage into
-   real backend endpoints + a clinical-side table, and/or enforce the JWT on
-   the chat WebSocket (currently issued but unchecked everywhere)
+   done 2026-08-22 for identity (`students`); clinical-side tables
+   (`mood_entries`, `journal_entries`, `assessment_results`) added
+   2026-08-22/2026-09-20, all keyed by `anonymous_id` with no FK back to
+   `students`
+7. ~~Move mood data from AsyncStorage to a real backend endpoint~~ done
+   2026-08-22 (`backend/app/mood.py`, JWT-protected)
+8. ~~Move journal + assessment data from AsyncStorage to real backend
+   endpoints, and enforce the JWT on the chat WebSocket~~ done 2026-09-20 —
+   see "Journal + assessments backend, chat auth" below
+9. **Next up:** counselor appointments (offline/in-person booking) and
+   notifications are the two roadmap items with no backend or frontend work
+   at all yet; both still deliberately parked pending explicit go-ahead
 
 ## Backend (built 2026-08-22)
 `backend/` — FastAPI + LangChain + Ollama, one real endpoint:
@@ -171,9 +183,8 @@ despite being code-specialized rather than general-purpose). See
   list in that coroutine) — no session IDs, no persistence. Closing the
   connection (reload, app restart) discards the conversation, same as the
   frontend already did before this.
-- **Auth**: none on the WebSocket. The frontend's anonymous session is still
-  entirely mock (see `AuthContext.tsx`), so there's no real token to verify
-  yet — don't treat this endpoint as access-controlled.
+- **Auth**: as of 2026-09-20, the same JWT as every other endpoint, checked
+  before `accept()` — see "Journal + assessments backend, chat auth" below.
 - **Frontend wiring**: `chat.tsx` now streams real tokens into the AI bubble
   progressively via `src/constants/config.ts`'s `CHAT_WS_URL`.
   `config.ts` auto-detects the right host at runtime (browser hostname on
@@ -208,9 +219,11 @@ for full setup (role/database creation, env vars).
   module. Used `bcrypt` directly instead.
 - **JWT**: HS256, `PyJWT`, ~30-day expiry, secret from `backend/.env`'s
   `JWT_SECRET` (gitignored, generated locally — not committed).
-- **Not done**: nothing checks this JWT on any endpoint yet (chat included)
-  — it's issued but not yet enforced anywhere. That's the natural next step,
-  not part of this slice.
+- **Update 2026-09-20**: the JWT is now enforced everywhere — `/mood`,
+  `/journal`, `/assessments` all require it via `security.py`'s
+  `get_current_anonymous_id` dependency, and the chat WebSocket checks it
+  too (see below). Nothing in the app accepts an unauthenticated request to
+  student data anymore.
 - **Frontend wiring**: `AuthContext.tsx`'s `requestOtp`/`verifyOtp` are now
   `async` and call the real endpoints via `fetch` (`API_BASE_URL` in
   `src/constants/config.ts`); `login.tsx`/`verify-otp.tsx` show loading
@@ -222,10 +235,65 @@ for full setup (role/database creation, env vars).
   `backend/app/main.py` because plain HTTP POST from the browser needs it
   (unlike the WebSocket, which doesn't hit the same preflight mechanism).
 
+## Journal + assessments backend, chat auth (built 2026-09-20)
+Closed the two biggest gaps between "mobile UI looks done" and "backend is
+actually real": journal and assessments were still AsyncStorage-only despite
+having tables in `models.py` since 2026-08-22, and the chat WebSocket had no
+auth check despite JWTs having existed since that same day.
+
+- **`backend/app/journal.py`**: `GET/POST /journal`, `PUT/DELETE
+  /journal/{id}`. Same shape as `mood.py` — JWT-protected via
+  `get_current_anonymous_id`, every query filtered by `anonymous_id`, and
+  update/delete first look up the row scoped to the caller's own
+  `anonymous_id` (a 404, not a 403, if it belongs to someone else — doesn't
+  reveal whether the ID exists at all).
+- **`backend/app/assessment.py`**: `GET/POST /assessments`, same pattern,
+  `type` constrained to `Literal["PHQ-9", "GAD-7"]`.
+- **`backend/app/security.py`**: refactored to split `decode_jwt(token) ->
+  anonymous_id` (raises `InvalidToken`) out from the existing
+  `get_current_anonymous_id` HTTP dependency, so the chat WebSocket (which
+  can't use `HTTPBearer`/`Depends` the same way) can reuse the exact same
+  validation logic instead of a second copy.
+- **`backend/app/chat.py`**: the socket now takes `?token=<jwt>` as a query
+  param (browsers can't set custom headers on a WebSocket handshake, so a
+  header-based `Authorization` isn't an option) and validates it with
+  `decode_jwt` before doing anything else. **Non-obvious fix worth knowing
+  if this pattern gets reused elsewhere:** rejecting via `websocket.close()`
+  *before* `websocket.accept()` gets silently turned into a bare HTTP 403 by
+  this ASGI stack — the browser sees an opaque connection failure with no
+  readable close code, so a client-side "session expired" message keyed off
+  a specific close code would never fire. Fixed by always calling
+  `accept()` first and immediately `close()`-ing with a custom code
+  (`4401`) when the token's missing/invalid — confirmed working via a raw
+  `websockets` client test (no-token close code arrives as `4401` with
+  reason `"Missing auth token."`; a valid token stays open).
+- **Frontend**: `JournalContext.tsx` and `AssessmentContext.tsx` rewritten
+  off AsyncStorage onto these endpoints, following `MoodContext.tsx`'s
+  exact pattern (fetch-on-sign-in, optimistic local state update on
+  success, `{success, error}` return values). `journal-entry.tsx` and
+  `Questionnaire.tsx` (shared PHQ-9/GAD-7 flow) updated for the now-async
+  save calls — both show a spinner mid-save and a real error message on
+  failure, matching `mood-tracker.tsx`'s existing UX convention.
+  `chat.tsx` passes the signed-in JWT on the socket URL and shows a
+  friendly message if the socket closes with code `4401`.
+- **Verified end-to-end** against a real local Postgres instance (not just
+  typechecked): full journal CRUD lifecycle, assessment create/list,
+  cross-user data isolation (a second account cannot see or edit the
+  first's rows), and all three chat-socket auth paths (no token, garbage
+  token, valid token). Test rows/accounts created during this were deleted
+  afterward — nothing was left behind in the dev database.
+- **Still not done**: `students.email` intentionally never reaches the
+  clinical tables (double-blind principle holds — same as before), but
+  there's still no admin/audit tooling, no rate limiting on any endpoint,
+  and appointments/notifications remain completely unbuilt (see roadmap
+  below) — none of that was in scope for this slice.
+
 ## Full Product Scope (Roadmap)
-Noted 2026-08-22 for future reference — **not started**, do not begin building
-against this until asked. Current work is still the mobile UI scaffold plus a
-mock login flow (see "Current Codebase Status" above); nothing below exists yet.
+Noted 2026-08-22 for future reference. As of 2026-09-20: auth, mood,
+journal, and assessments are real (Postgres + JWT-protected endpoints);
+chat is real and now also JWT-protected; only **appointments** and
+**notifications** remain unbuilt (both intentionally parked — do not start
+either without explicit go-ahead).
 
 **Mobile app**
 - Login and registration (built — real backend OTP auth now; see "Auth" below)
@@ -243,14 +311,16 @@ mock login flow (see "Current Codebase Status" above); nothing below exists yet.
 
 **Backend server**
 - Authentication (built — real OTP/JWT; see "Auth" section above)
-- Student profiles
-- Mood records
-- Assessments
-- Journals
-- Appointments
-- AI chat requests
-- Notifications
-- Database access
+- Student profiles (minimal — just email + anonymous_id on `students`; no
+  separate profile-editing endpoint exists)
+- Mood records (built — `backend/app/mood.py`, JWT-protected)
+- Assessments (built — `backend/app/assessment.py`, JWT-protected)
+- Journals (built — `backend/app/journal.py`, JWT-protected)
+- Appointments (not started — intentionally parked)
+- AI chat requests (built — streaming WebSocket, JWT-protected; no
+  persistence, conversation lives only in that connection's memory)
+- Notifications (not started)
+- Database access (built — SQLAlchemy + Postgres, all four tables live)
 
 **Database and AI**
 - PostgreSQL for application data
