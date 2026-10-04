@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import Appointment
-from app.security import get_current_anonymous_id
+from app.security import get_current_anonymous_id, get_current_counselor
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
@@ -126,4 +126,55 @@ def cancel_appointment(
     db.commit()
     db.refresh(app)
     return _serialize(app)
+
+
+class UpdateStatusBody(BaseModel):
+    status: str
+
+
+@router.get("/counselor-schedule")
+def get_counselor_schedule(
+    counselor_payload: dict = Depends(get_current_counselor),
+    db: Session = Depends(get_db),
+):
+    counselor_name = counselor_payload.get("counselor_name")
+    apps = (
+        db.query(Appointment)
+        .filter(Appointment.counselor_name == counselor_name)
+        .order_by(Appointment.created_at.desc())
+        .all()
+    )
+    result = []
+    for a in apps:
+        item = _serialize(a)
+        short_id = a.anonymous_id[:8] if a.anonymous_id else "unknown"
+        item["student_alias"] = f"Anonymous Student #{short_id}"
+        result.append(item)
+    return result
+
+
+@router.put("/{appointment_id}/status")
+def update_appointment_status(
+    appointment_id: int,
+    body: UpdateStatusBody,
+    counselor_payload: dict = Depends(get_current_counselor),
+    db: Session = Depends(get_db),
+):
+    app = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Appointment not found.")
+
+    valid_statuses = ["scheduled", "completed", "canceled"]
+    if body.status.lower() not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Status must be one of {valid_statuses}")
+
+    app.status = body.status.lower()
+    db.commit()
+    db.refresh(app)
+
+    item = _serialize(app)
+    short_id = app.anonymous_id[:8] if app.anonymous_id else "unknown"
+    item["student_alias"] = f"Anonymous Student #{short_id}"
+    return item
+
 

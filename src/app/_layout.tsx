@@ -64,8 +64,9 @@ function RootNavigator() {
         <Stack.Screen name="profile" options={{ presentation: 'modal', title: 'Profile' }} />
       </Stack.Protected>
 
-      {/* Always reachable, regardless of auth state — help shouldn't be gated.
-          Declared last so it never wins the stack's default initial route. */}
+      {/* Always reachable, regardless of auth state */}
+      <Stack.Screen name="counselor-login" options={{ title: 'Counselor Login' }} />
+      <Stack.Screen name="counselor-portal" options={{ title: 'Counselor Schedule', headerLeft: () => null }} />
       <Stack.Screen name="crisis-resources" options={{ title: 'Crisis Resources' }} />
     </Stack>
   );

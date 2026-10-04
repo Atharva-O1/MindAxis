@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -113,6 +114,23 @@ export default function LoginScreen() {
               Your identity is never stored alongside clinical or session data.
             </Text>
           </Animated.View>
+
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: Spacing.one,
+              marginTop: Spacing.two,
+              paddingVertical: Spacing.two,
+            }}
+            onPress={() => router.push('/counselor-login')}
+          >
+            <MaterialIcons name="medical-services" size={16} color={Colors.primary} />
+            <Text style={{ fontSize: FontSize.sm, fontWeight: '600', color: Colors.primary }}>
+              Campus Staff / Counselor Login
+            </Text>
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

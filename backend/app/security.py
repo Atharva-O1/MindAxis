@@ -54,3 +54,28 @@ def get_current_anonymous_id(
         return decode_jwt(credentials.credentials)
     except InvalidToken as exc:
         raise HTTPException(status_code=401, detail=str(exc))
+
+
+def create_counselor_jwt(counselor_name: str) -> str:
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": f"counselor:{counselor_name}",
+        "role": "counselor",
+        "counselor_name": counselor_name,
+        "iat": now,
+        "exp": now + timedelta(days=JWT_EXPIRY_DAYS),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def get_current_counselor(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+) -> dict:
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("role") != "counselor" or not payload.get("counselor_name"):
+            raise HTTPException(status_code=403, detail="Counselor access required.")
+        return payload
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid session. Please log in again.")
+

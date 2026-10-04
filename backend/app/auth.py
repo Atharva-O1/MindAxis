@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.email_service import send_otp_email
 from app.models import Student
-from app.security import create_jwt
+import os
+from app.security import create_counselor_jwt, create_jwt
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -84,3 +85,30 @@ def verify_otp(body: VerifyOtpBody, db: Session = Depends(get_db)):
 
     token = create_jwt(student.anonymous_id)
     return {"token": token, "anonymous_id": student.anonymous_id}
+
+
+class CounselorLoginBody(BaseModel):
+    counselor_name: str
+    counselor_key: str
+
+
+COUNSELOR_ACCESS_KEY = os.getenv("COUNSELOR_ACCESS_KEY", "COUNSELOR2026")
+
+
+@router.post("/counselor-login")
+def counselor_login(body: CounselorLoginBody):
+    key = body.counselor_key.strip()
+    if key != COUNSELOR_ACCESS_KEY:
+        raise HTTPException(status_code=401, detail="Invalid Counselor Access Key.")
+
+    counselor_name = body.counselor_name.strip()
+    if not counselor_name:
+        raise HTTPException(status_code=400, detail="Counselor name is required.")
+
+    token = create_counselor_jwt(counselor_name)
+    return {
+        "token": token,
+        "counselor_name": counselor_name,
+        "role": "counselor",
+    }
+
