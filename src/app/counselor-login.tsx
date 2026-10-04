@@ -152,7 +152,7 @@ export default function CounselorLoginScreen() {
             <Text style={styles.label}>Access Key</Text>
             <TextInput
               style={[styles.input, error ? styles.inputError : null]}
-              placeholder="Enter Access Key (MINDAXIS26)"
+              placeholder="Enter Counselor Access Key"
               placeholderTextColor={Colors.textMuted}
               secureTextEntry
               value={accessKey}
