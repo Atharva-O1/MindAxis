@@ -18,7 +18,7 @@ function getDevServerHost(): string {
   if (hostUri) {
     return hostUri.split(':')[0];
   }
-  return 'localhost';
+  return '192.168.29.6';
 }
 
 const HOST = getDevServerHost();
