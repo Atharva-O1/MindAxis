@@ -26,6 +26,6 @@ const HOST = getDevServerHost();
 // Still overridable via .env.local (EXPO_PUBLIC_*) for edge cases — e.g. the
 // backend running on a different machine than the one serving the app.
 export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? 'https://small-numbers-own.loca.lt';
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? 'https://shaky-drinks-dream.loca.lt';
 export const CHAT_WS_URL =
-  process.env.EXPO_PUBLIC_CHAT_WS_URL ?? 'wss://small-numbers-own.loca.lt/ws/chat';
+  process.env.EXPO_PUBLIC_CHAT_WS_URL ?? 'wss://shaky-drinks-dream.loca.lt/ws/chat';
