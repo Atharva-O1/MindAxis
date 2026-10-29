@@ -23,9 +23,28 @@ function getDevServerHost(): string {
 
 const HOST = getDevServerHost();
 
-// Still overridable via .env.local (EXPO_PUBLIC_*) for edge cases — e.g. the
-// backend running on a different machine than the one serving the app.
-export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? 'https://mindaxis-api.loca.lt';
-export const CHAT_WS_URL =
-  process.env.EXPO_PUBLIC_CHAT_WS_URL ?? 'wss://mindaxis-api.loca.lt/ws/chat';
+function getApiBaseUrl(): string {
+  // If running in browser on localhost/127.0.0.1, always connect to local backend directly
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://localhost:8000';
+    }
+  }
+  return process.env.EXPO_PUBLIC_API_BASE_URL ?? `http://${HOST}:8000`;
+}
+
+function getChatWsUrl(): string {
+  // If running in browser on localhost/127.0.0.1, always connect to local WebSocket directly
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'ws://localhost:8000/ws/chat';
+    }
+  }
+  return process.env.EXPO_PUBLIC_CHAT_WS_URL ?? `ws://${HOST}:8000/ws/chat`;
+}
+
+export const API_BASE_URL = getApiBaseUrl();
+export const CHAT_WS_URL = getChatWsUrl();
+

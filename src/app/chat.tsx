@@ -51,11 +51,14 @@ export default function ChatScreen() {
   const listRef = useRef<FlatList<Message>>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
-  useEffect(() => {
-    // This screen only renders once signed in (see src/app/_layout.tsx), so
-    // token should always be set here — but skip connecting rather than
-    // handing the backend an empty token if that assumption ever breaks.
-    if (!token) return;
+  const connect = () => {
+    if (!token) return null;
+    if (
+      wsRef.current &&
+      (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)
+    ) {
+      return wsRef.current;
+    }
 
     const socket = new WebSocket(`${CHAT_WS_URL}?token=${encodeURIComponent(token)}`);
     wsRef.current = socket;
@@ -105,8 +108,13 @@ export default function ChatScreen() {
       }
     };
 
+    return socket;
+  };
+
+  useEffect(() => {
+    const socket = connect();
     return () => {
-      socket.close();
+      socket?.close();
       wsRef.current = null;
     };
   }, [token]);
@@ -120,14 +128,49 @@ export default function ChatScreen() {
     setMessages((prev) => [...prev, userMessage]);
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
 
-    const socket = wsRef.current;
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
+    let socket = wsRef.current;
+    if (!socket || socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
+      socket = connect();
+    }
+
+    if (!socket) {
       setMessages((prev) => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           sender: 'ai',
-          text: "Not connected to the companion right now. Try reloading the app.",
+          text: "Not connected to the companion right now. Make sure the backend is running.",
+          isError: true,
+        },
+      ]);
+      return;
+    }
+
+    if (socket.readyState === WebSocket.CONNECTING) {
+      setIsTyping(true);
+      const pendingText = trimmed;
+      const onOpen = () => {
+        socket?.send(JSON.stringify({ type: 'user_message', text: pendingText }));
+      };
+      if (typeof socket.addEventListener === 'function') {
+        socket.addEventListener('open', onOpen, { once: true });
+      } else {
+        const prevOpen = socket.onopen;
+        socket.onopen = (e) => {
+          if (prevOpen) prevOpen.call(socket, e);
+          onOpen();
+        };
+      }
+      return;
+    }
+
+    if (socket.readyState !== WebSocket.OPEN) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          sender: 'ai',
+          text: "Not connected to the companion right now. Make sure the backend is running.",
           isError: true,
         },
       ]);
